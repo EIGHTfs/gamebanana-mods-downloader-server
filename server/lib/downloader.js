@@ -37,6 +37,12 @@ const cfg = require("../config");
 const gbApi = require("./gb-api");
 const mapping = require("./mapping");
 
+// 2026-08-26 性能优化（实测 images.gamebanana.com 首连接 28-30s，keep-alive 复用后 0.7s）：
+//   下载连接池——并发下载图片/文件时复用 TCP/TLS 连接，避免每文件吃一次慢首连接
+const KEEP_ALIVE_MS = 60000;
+const HTTPS_AGENT = new https.Agent({ keepAlive: true, keepAliveMsecs: KEEP_ALIVE_MS, maxSockets: 64, maxFreeSockets: 32 });
+const HTTP_AGENT = new http.Agent({ keepAlive: true, keepAliveMsecs: KEEP_ALIVE_MS, maxSockets: 64, maxFreeSockets: 32 });
+
 const TASK_FILE = path.join(__dirname, "..", "download_task.json");
 const MAX_RETRY = 3;
 const RETRY_DELAY_MS = 1500;
@@ -716,7 +722,7 @@ function downloadToFile(item, settings, onProgress) {
 
       let done = false;
       let stallTimer = null;
-      const req = mod.get(u, { headers, timeout: 120000 }, (res) => {
+      const req = mod.get(u, { headers, timeout: 120000, agent: parsed.protocol === "https:" ? HTTPS_AGENT : HTTP_AGENT }, (res) => {
         const code = res.statusCode || 0;
         if (code >= 300 && code < 400 && res.headers.location) {
           res.resume();

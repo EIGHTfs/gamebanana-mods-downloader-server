@@ -637,21 +637,29 @@ async function prepareMod(url) {
       }
     }
     const trashSet = new Set(trashNames);
-    // 2026-08-26 简化（归档文件已直接下载）：找回只做「原名精确匹配」——
-    //   · 直接同名（手动移入未加前缀）
-    //   · 「dup-归位-<角色短名>-<原名>」/「dup-仓库散落-<ts>-<原名>」前缀
-    //   GB 更新文件名的旧版不再特殊匹配：归档文件（_aArchivedFiles）会作为独立下载项
-    //   按原名下载，垃圾桶里的同名旧版会被正常跳过，无需去后缀模糊找回。
+    // 2026-08-26 修复（实测 bottom_heavy_furina_top_heavy_）：垃圾桶旧版名与 GB 当前名
+    //   不同（GB 加 2026_ 年份前缀 + _哈希后缀），精确匹配找回失败 → 加「核心名模糊匹配」。
+    //   兼容：直接同名、dup- 前缀、核心名一致（去年份前缀/哈希后缀/去符号）。
     const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const coreName = (name) =>
+      String(name || "")
+        .replace(/\.(zip|rar|7z)$/i, "")
+        .replace(/^\d{4}_/, "")
+        .replace(/_?[0-9a-f]{4,8}$/i, "")
+        .replace(/[_\-\s]+/g, "")
+        .toLowerCase();
     const isTrashName = (candidate) => {
       if (!candidate) return false;
       if (trashSet.has(candidate)) return true;
+      const candCore = coreName(candidate);
       return trashNames.some((n) => {
         const base = path.basename(String(n)); // 子路径（dup-归位-xxx/文件）取文件名匹配
         const re = new RegExp("^dup-归位-([^\-]+)-" + esc(candidate) + "$");
         if (re.test(base)) return true;
         const re2 = new RegExp("^dup-仓库散落-\d+-" + esc(candidate) + "$");
         if (re2.test(base)) return true;
+        // 核心名模糊匹配：垃圾桶名(去年份前缀/哈希后缀/符号) == GB 当前名核心 → 可找回
+        if (candCore && coreName(base) === candCore) return true;
         return false;
       });
     };
@@ -683,7 +691,10 @@ async function prepareMod(url) {
             const base = path.basename(n); // 子路径取文件名部分匹配
             const re = new RegExp("^dup-归位-([^\-]+)-" + esc2(w.name) + "$");
             const re2 = new RegExp("^dup-仓库散落-\d+-" + esc2(w.name) + "$");
-            return re.test(base) || re2.test(base);
+            if (re.test(base) || re2.test(base)) return true;
+            // 核心名模糊匹配（2026-08-26 修复）：垃圾桶旧版名核心 == GB 当前名核心
+            if (coreName(base) && coreName(base) === coreName(w.name)) return true;
+            return false;
           });
           if (hitName) srcPick = path.join(trashDir, hitName); // 可能是子路径 → 完整拼接
         }

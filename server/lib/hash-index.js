@@ -194,15 +194,18 @@ function ingestModDir(modDir) {
   return { gbAdded, localAdded, saved };
 }
 
-// ---------- 全量重建（从所有游戏根 description.html 提取，写入两张表）----------
+// ---------- 全量重建（从所有游戏根 description.html 提取，与旧表合并追加；只增不删）----------
 async function rebuild() {
   if (buildState.running) return { running: true, error: "正在重建中" };
   buildState.running = true;
   buildState.error = "";
   const t0 = Date.now();
-  const gb = new Map();
-  const local = new Map();
-  const name = new Map();
+  // 2026-08-26 用户原则（只增不删）：从旧表合并 + 新扫描追加，不重建空表
+  //   ——GB 表/name 表是共享线上信息（提交 git），local 表是本地落盘信息，
+  //   磁盘文件被清理后旧条目仍保留（垃圾桶找回/反查仍可用）
+  const gb = loadMap(GB_FILE);
+  const local = loadMap(LOCAL_FILE);
+  const name = loadMap(NAME_FILE);
   let htmls = 0;
   try {
     const cfg = require("../config");

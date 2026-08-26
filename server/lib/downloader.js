@@ -36,6 +36,7 @@ const http = require("http");
 const cfg = require("../config");
 const gbApi = require("./gb-api");
 const mapping = require("./mapping");
+const organize = require("./organize");
 
 // 2026-08-26 性能优化（实测 images.gamebanana.com 首连接 28-30s，keep-alive 复用后 0.7s）：
 //   下载连接池——并发下载图片/文件时复用 TCP/TLS 连接，避免每文件吃一次慢首连接
@@ -363,18 +364,24 @@ function findExistingDir(root, finalDir, mod, wantFiles) {
   }
 
   const dirs = [];
-  const warehouseFiles = []; // { dir(裸仓库), files:[...] }——2026-08-26 用户规则：仓库目录里的匹配文件移动文件本身
+  // 2026-08-26 用户规则：裸仓库目录（角色/装备等分类层）里的匹配文件移动文件本身
+  const warehouseFiles = []; // { dir(裸仓库), files:[...], deleteHtml: true }
+  // 2026-08-26 用户规则（新增）：直接移动文件夹前先检查文件夹名是不是当前 mod 名
+  //   （[作者] mod名 / mod名）——文件夹名不是 mod 名的（可能是别的 mod 的正确目录，
+  //   只是里面混入了本 mod 的文件，如 [Maquian] MAVUIKA-PRIME-SUPER-HEAVY 里混了 Sandrone 文件）
+  //   → 不整夹移动，只移动匹配的文件本身（不动别人的目录、不删其 HTML）
+  const moveFilesOnly = []; // { dir, files:[...], relDir, deleteHtml: bool }
   for (const [dir, g] of byDir) {
     const bn = path.basename(dir);
     if (knownWh.has(String(bn).toLowerCase().trim())) {
-      warehouseFiles.push({ dir, files: g.files, relDir: path.relative(root, dir) });
+      warehouseFiles.push({ dir, files: g.files, relDir: path.relative(root, dir), deleteHtml: true });
       continue; // 裸仓库目录不整体移动（匹配文件由调用方移动文件本身 + 删仓库根 HTML）
     }
-    let hasSubdir = false;
-    try {
-      hasSubdir = fs.readdirSync(dir, { withFileTypes: true }).some((e) => e.isDirectory() && !e.name.startsWith("."));
-    } catch (_) {}
-    if (hasSubdir && !isContainerName(bn)) continue; // 容器目录只认 [作者] mod名 / mod名
+    // 2026-08-26 用户规则：整夹移动前先检查文件夹名是不是当前 mod 名
+    if (!isContainerName(bn)) {
+      moveFilesOnly.push({ dir, files: g.files, relDir: path.relative(root, dir), deleteHtml: false });
+      continue; // 非 mod 名目录（可能是别的 mod 的正确目录）→ 只移动匹配文件本身
+    }
     dirs.push({ dir, score: g.score, files: g.files, bn, relDir: path.relative(root, dir) });
   }
   // 排序：含压缩包多优先 → 名字是 [作者]mod/mod名 优先 → 浅优先
@@ -383,7 +390,7 @@ function findExistingDir(root, finalDir, mod, wantFiles) {
     ((isContainerName(b.bn) ? 1 : 0) - (isContainerName(a.bn) ? 1 : 0)) ||
     (a.relDir.split(path.sep).length - b.relDir.split(path.sep).length)
   );
-  return { dirs, warehouseFiles };
+  return { dirs, warehouseFiles, moveFilesOnly };
 }
 
 // 执行移动：mv 源文件夹 → 目标完整下载路径；目标已存在则合并（不覆盖，不丢文件）
@@ -536,6 +543,7 @@ async function prepareMod(url) {
   const found = findExistingDir(target.root, finalDir, mod, wantFiles);
   const foundDirs = (found && found.dirs) || [];
   const warehouseFiles = (found && found.warehouseFiles) || [];
+  const moveFilesOnly = (found && found.moveFilesOnly) || []; // 2026-08-26 非 mod 名目录 → 只移匹配文件本身
   const movedList = [];
   if (foundDirs.length) {
     for (const f of foundDirs) {
@@ -544,9 +552,12 @@ async function prepareMod(url) {
       else if (mv.reason === "same") movedList.push(f.relDir + "(已在目标)");
     }
   }
-  // 裸仓库目录里的匹配文件：移动文件本身到目标；删仓库根 HTML
-  if (warehouseFiles.length) {
-    for (const w of warehouseFiles) {
+  // 裸仓库目录/非 mod 名目录里的匹配文件：移动文件本身到目标；
+  //   裸仓库（warehouseFiles.deleteHtml）→ 顺带删仓库根 HTML；
+  //   非 mod 名目录（moveFilesOnly）→ 只移文件，不删其 HTML（那是别的 mod 的目录）
+  const moveOnlyAll = [...warehouseFiles, ...moveFilesOnly];
+  if (moveOnlyAll.length) {
+    for (const w of moveOnlyAll) {
       let ents = [];
       try { ents = fs.readdirSync(w.dir, { withFileTypes: true }); } catch (_) { continue; }
       for (const e of ents) {
@@ -561,8 +572,10 @@ async function prepareMod(url) {
           try { fs.renameSync(s, d); movedList.push(w.relDir + "/" + e.name); } catch (_) {}
         }
       }
-      // 2026-08-26 用户规则：裸仓库目录下的 HTML 删除（残留壳）
-      try { const h = path.join(w.dir, "description.html"); if (fs.existsSync(h)) { fs.unlinkSync(h); console.log("[step2-warehouse-html] 删除仓库根HTML:", h.replace(target.root + "/", "")); } } catch (_) {}
+      // 2026-08-26 用户规则：仅裸仓库目录（deleteHtml）删 HTML（残留壳）；非 mod 名目录不删
+      if (w.deleteHtml) {
+        try { const h = path.join(w.dir, "description.html"); if (fs.existsSync(h)) { fs.unlinkSync(h); console.log("[step2-warehouse-html] 删除仓库根HTML:", h.replace(target.root + "/", "")); } } catch (_) {}
+      }
     }
   }
   report.step2 = { found: [...foundDirs.map((f) => f.relDir), ...warehouseFiles.map((w) => w.relDir)], moved: movedList.length, movedList };
@@ -579,6 +592,18 @@ async function prepareMod(url) {
     }
   }
   writeIndexHtml(finalDir, obj);
+
+  // ---- 2026-08-26 用户要求：下载时自动整理（不在 HTML 文件列表的文件 → 移入垃圾桶）----
+  // 判定（用户原话）：HTML 现在会记住历史文件（legacy 追加合并），真正属于本 mod 的文件
+  //   都在列表里；不在列表的 = 错误归类的外部 mod 遗留 → 移入游戏根垃圾桶（.trash）。
+  //   移入时保留 GB 原名 → 将来下载其真正所属 mod 时 trash-restore 按原名自动找回归位。
+  try {
+    const org = organize.organizeDir(finalDir, trashRoot);
+    if (org.moved && org.moved.length) {
+      report.step3.autoOrganized = org.moved;
+      console.log("[auto-organize]", (finalDir.split("/Mods/")[1] || finalDir).slice(0, 50), "→ 移出", org.moved.length, "个外部文件");
+    }
+  } catch (_) {}
 
   // ---- 第三步：整理阶段（part 文件 + 图片 md5 重命名去重）----
   const root = target.root;

@@ -19,6 +19,7 @@ const JSON_DIR = process.env.GBMD_JSON_DIR ? path.resolve(process.env.GBMD_JSON_
 const GB_FILE = path.join(JSON_DIR, "gb-hash-index.json");
 const LOCAL_FILE = path.join(JSON_DIR, "local-hash-index.json");
 const NAME_FILE = path.join(JSON_DIR, "html-name-index.json"); // HTML 反查：GB 原名(短名) -> mod
+const organize = require("./organize"); // 2026-08-26 下载时/rebuild 时自动整理
 
 const INDEX_TAG_ID = "gbmd-index";
 
@@ -213,7 +214,7 @@ async function rebuild() {
       if (r && !seen.has(r)) { seen.add(r); roots.push(r); }
     }
     let count = 0;
-    const walk = async (dir) => {
+    const walk = async (dir, root) => {
       let ents = [];
       try { ents = await fs.promises.readdir(dir, { withFileTypes: true }); } catch (_) { return; }
       for (const e of ents) {
@@ -259,12 +260,21 @@ async function rebuild() {
                 if (!local.has(dk)) local.set(dk, { modDir: dir, file: dn, hash: dk, gbMd5: dk, kind: "image", ...gbMeta });
               }
             } catch (_) {}
+            // 2026-08-26 用户要求：手动建立 HTML 反查时顺带清理——不在 HTML 列表的
+            //   外部 mod 遗留文件 → 移入本游戏根垃圾桶（.trash）。移入保留原名，
+            //   将来下载其真正所属 mod 时 trash-restore 按原名自动找回归位。
+            try {
+              const org = organize.organizeDir(dir, path.join(root, ".trash"));
+              if (org.moved && org.moved.length) {
+                console.log("[rebuild-organize]", (dir.split("/Mods/")[1] || dir).slice(0, 50), "→ 移出", org.moved.length, "个外部文件");
+              }
+            } catch (_) {}
           }
         }
         if (++count % 300 === 0) await new Promise((r) => setImmediate(r));
       }
     };
-    for (const r of roots) { if (r && fs.existsSync(r)) await walk(r); }
+    for (const r of roots) { if (r && fs.existsSync(r)) await walk(r, r); }
     gbIndex = gb;
     localIndex = local;
     nameIndex = name;

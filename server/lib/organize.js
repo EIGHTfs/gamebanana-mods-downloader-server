@@ -133,8 +133,10 @@ function cleanEmptyDirs(root, trashDir) {
 
 // 扫描 modDir：不在 HTML 文件列表里的文件 → 移入 trashDir（保留原名，同名冲突加前缀）
 // modId 参数：当前 mod 的 modId；反查命中同 modId 的文件视为旧版本，保留（返回 kept）
+// relDir 参数（可选）：modDir 相对游戏根的路径，移入垃圾桶时镜像到 trashDir/<relDir>/<文件名>，
+//   保留来源目录结构（2026-08-26 用户要求，吸取教训：平铺丢层级难还原）
 // 返回 { moved: [文件名], kept: [文件名], skipped: bool, reason: string }
-function organizeDir(modDir, trashDir, modId) {
+function organizeDir(modDir, trashDir, modId, relDir) {
   const obj = readIndexObj(modDir);
   if (!obj) return { moved: [], kept: [], skipped: true, reason: "无 HTML 索引" };
   const known = new Set(); // 小写文件名集合（files/images/gifs，含 legacy 历史记录）
@@ -153,6 +155,7 @@ function organizeDir(modDir, trashDir, modId) {
   const moved = [];
   const kept = [];
   const curModId = String(modId || obj.modId || "").trim();
+  if (relDir) { try { fs.mkdirSync(path.join(trashDir, relDir), { recursive: true }); } catch (_) {} }
   for (const e of ents) {
     if (!e.isFile()) continue; // 只处理文件（子目录由各自 HTML 管理，不整夹移动）
     const name = e.name;
@@ -177,8 +180,10 @@ function organizeDir(modDir, trashDir, modId) {
     // ③ 仅图片类（jpg/png/gif/webp 等）不在列表 → 移入垃圾桶（md5 名图、序列名图、
     //    别 mod 预览图等历史遗留；保留原名供 trash-restore 找回）
     const src = path.join(modDir, name);
-    let dst = path.join(trashDir, name);
-    if (fs.existsSync(dst)) dst = path.join(trashDir, `auto-整理-${Date.now()}-${name}`);
+    // 2026-08-26 用户要求：垃圾桶保留来源目录结构（trashDir/<relDir>/<文件名>）
+    const baseTrashDir = relDir ? path.join(trashDir, relDir) : trashDir;
+    let dst = path.join(baseTrashDir, name);
+    if (fs.existsSync(dst)) dst = path.join(baseTrashDir, `auto-整理-${Date.now()}-${name}`);
     try {
       fs.renameSync(src, dst);
       moved.push(name);

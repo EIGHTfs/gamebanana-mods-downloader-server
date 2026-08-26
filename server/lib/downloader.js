@@ -733,7 +733,10 @@ async function prepareMod(url) {
   //   organizeDir 传当前 modId，name-index 反查命中同 modId 的旧版本文件保留（org.kept），
   //   并追加进 HTML files legacy 记录——下次不再被当外部文件清理。
   try {
-    const org = organize.organizeDir(finalDir, trashRoot, mod.modId);
+    // 2026-08-26 用户要求：垃圾桶保留来源目录结构——传 finalDir 相对游戏根的路径
+    let relDir = "";
+    try { relDir = path.relative(target.root, finalDir); } catch (_) {}
+    const org = organize.organizeDir(finalDir, trashRoot, mod.modId, relDir);
     if (org.kept && org.kept.length) {
       // 旧版本文件（GB 页面已下架，但本地保留）→ 追加进 HTML 记录
       let htmlChanged = false;

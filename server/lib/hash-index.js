@@ -277,7 +277,11 @@ async function rebuild() {
         if (++count % 300 === 0) await new Promise((r) => setImmediate(r));
       }
     };
-    for (const r of roots) { if (r && fs.existsSync(r)) await walk(r, r); }
+    for (const r of roots) {
+      if (r && fs.existsSync(r)) await walk(r, r);
+      // 2026-08-26 用户决定：自动空壳清理已取消（曾误清 1672 个目录）——以后由用户
+      //   手动触发整理，不再 rebuild 时自动清理。
+    }
     gbIndex = gb;
     localIndex = local;
     nameIndex = name;

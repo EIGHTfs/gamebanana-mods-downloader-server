@@ -1114,9 +1114,13 @@ async function init() {
   loadGameSelects();
   await loadSettings();
   try {
-    // 2026-08-26 修复（用户反馈：重启后恢复成之前搜的巨量任务）：
-    //   启动时【不】自动恢复搜索缓存（巨量搜索结果列表不再出现）。
-    //   只恢复「搜索正在后台运行」的状态：若 search-status 是 running 才继续轮询
+    // 2026-08-26 恢复显示最近一次搜索结果（用户要求：重启后恢复显示，不被覆盖）
+    const c = await api("/api/search/cache");
+    if (c.cache && c.cache.results && c.cache.results.length) {
+      searchResults = c.cache.results;
+      renderSearchResults();
+    }
+    // 恢复「搜索正在后台运行」的状态：若 search-status 是 running 才继续轮询
     const st = await api("/api/search-status");
     if (st.task && st.task.status === "running") {
       $("#searchBtn").disabled = true;

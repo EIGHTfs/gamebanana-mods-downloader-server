@@ -1179,7 +1179,17 @@ async function startDownloadTask({ mods }) {
     task.message = `已追加 ${urls.length} 个 mod 到下载队列`;
     task.updatedAt = Date.now();
     saveTask();
+    // 2026-08-26 修复（用户反馈：paused 时提交显示「追加中」不下载）：
+    //   paused 状态提交新 mod → 自动恢复下载（用户期望立即开始，而非只追加）
     if (task.status === "running" || task.status === "preparing") {
+      runDownloadLoop();
+    } else if (task.status === "paused") {
+      task.status = "running";
+      task.pause = false;
+      task.abort = false;
+      task.message = `已恢复下载（追加 ${urls.length} 个 mod）`;
+      task.updatedAt = Date.now();
+      saveTask();
       runDownloadLoop();
     }
     return task;

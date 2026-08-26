@@ -558,11 +558,17 @@ async function prepareMod(url) {
   const moveOnlyAll = [...warehouseFiles, ...moveFilesOnly];
   if (moveOnlyAll.length) {
     for (const w of moveOnlyAll) {
+      // 2026-08-26 用户规则：抽文件前检查源目录有没有 description.html——
+      //   有 HTML = 完整 mod 目录，里面的同名图片可能被多个 mod 共用（同一 GB 短名
+      //   预览图），抽走会破坏其他 mod → 跳过不抽；无 HTML = 残留/散落目录，才抽。
+      //   （实测：Necomiya Uncensored 无 HTML，抽走无碍；有 HTML 的目录保守保留）
+      const srcHasHtml = fs.existsSync(path.join(w.dir, "description.html"));
       let ents = [];
       try { ents = fs.readdirSync(w.dir, { withFileTypes: true }); } catch (_) { continue; }
       for (const e of ents) {
         if (!e.isFile() || e.name.startsWith(".")) continue;
         if (!wantFiles[String(e.name).toLowerCase()]) continue;
+        if (srcHasHtml) continue; // 源目录有 HTML（完整 mod）→ 不抽，防共用图被抢
         const s = path.join(w.dir, e.name);
         const d = path.join(finalDir, e.name);
         if (fs.existsSync(d)) {

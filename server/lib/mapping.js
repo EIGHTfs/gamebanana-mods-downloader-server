@@ -44,21 +44,46 @@ function normKey(s) {
 
 // 仓库查找：返回映射值（字符串，可为 ""=跳过该层）；未映射返回 undefined
 // 优先查 mapping/<游戏>.json 的 warehouses；无该游戏文件时用代码内部默认
+// 归一化仓库名用于匹配：转小写、去空格/连字符、去尾复数 s（Character Skins→characterskins→characterskin）
+function normWarehouseKey(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "")
+    .replace(/s$/, "");
+}
+
 function warehouseLookup(name, game) {
   const s = String(name || "").trim();
   if (!s) return undefined;
   const sk = normKey(s);
   const skHead = sk.split("/")[0].trim(); // 复合分类取前段（Other/Misc → other）
+  const skNorm = normWarehouseKey(skHead || sk); // "character skins" → "characterskin"
   const gameMap = cfg.readGameMapping(game);
+  const tryMatch = (map) => {
+    if (!map) return undefined;
+    if (map[sk] !== undefined) return String(map[sk]);
+    if (skHead && map[skHead] !== undefined) return String(map[skHead]);
+    // 2026-08-26 修复：模糊匹配——归一化键相等即可
+    for (const [k, v] of Object.entries(map)) {
+      const kn = normKey(k).replace(/[\s_-]+/g, "").replace(/s$/, "");
+      if (kn === skNorm) return String(v);
+    }
+    // 首词匹配：Character Skins 的 skNorm=characterskin，映射有 characters（characters→character）→ 命中
+    for (const [k, v] of Object.entries(map)) {
+      const kn = normKey(k).replace(/[\s_-]+/g, "").replace(/s$/, "");
+      if (skNorm.startsWith(kn)) return String(v);
+      if (kn.startsWith(skNorm)) return String(v);
+    }
+    return undefined;
+  };
   if (gameMap && gameMap.warehouses && typeof gameMap.warehouses === "object") {
-    const wm = gameMap.warehouses;
-    if (wm[sk] !== undefined) return String(wm[sk]);
-    if (skHead && wm[skHead] !== undefined) return String(wm[skHead]);
+    const hit = tryMatch(gameMap.warehouses);
+    if (hit !== undefined) return hit;
     return undefined; // 文件存在但该键未映射（文件为准，不回退代码默认）
   }
   const defaults = cfg.CODE_WAREHOUSE_DEFAULTS;
-  if (defaults[sk] !== undefined) return String(defaults[sk]);
-  if (skHead && defaults[skHead] !== undefined) return String(defaults[skHead]);
+  const dhit = tryMatch(defaults);
+  if (dhit !== undefined) return dhit;
   return undefined;
 }
 

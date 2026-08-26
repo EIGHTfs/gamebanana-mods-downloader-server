@@ -1119,6 +1119,22 @@ async function finalizeHtmls() {
           }
         }
       }
+      // 2026-08-26 下载时顺便还原历史 md5 名图片：HTML 记录 hash(=内容md5) + file(=GB原名)，
+      //   若目录里存在 hash.jpg（旧逻辑遗留的 md5 名）→ 重命名为 GB 原名
+      let md5Reverted = 0;
+      try {
+        for (const im of obj.images || []) {
+          const md5 = String(im.hash || "").toLowerCase().trim();
+          const gbName = im.file || im.gbFile || "";
+          if (!/^[0-9a-f]{32}$/.test(md5) || !gbName) continue;
+          const md5Path = path.join(finalDir, md5 + path.extname(gbName));
+          const gbPath = path.join(finalDir, gbName);
+          if (fs.existsSync(md5Path) && !fs.existsSync(gbPath) && path.resolve(md5Path) !== path.resolve(gbPath)) {
+            try { fs.renameSync(md5Path, gbPath); md5Reverted++; changed = true; } catch (_) {}
+          }
+        }
+      } catch (_) {}
+      if (md5Reverted > 0) console.log(`[md5-revert] ${finalDir.split("/Mods/")[1] || finalDir} ← 还原 ${md5Reverted} 张 md5 名图片为 GB 原名`);
       // 2026-08-26 用户要求：追加旧文件——扫描目标目录，把磁盘上实际存在但 HTML 未记录
       //   的压缩包/图片（旧 mod、历史遗留、GB 页面已下架）补进 files/images（只读记录，不移动）
       const diskNames = [];

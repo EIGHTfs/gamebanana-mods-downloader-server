@@ -25,15 +25,17 @@ function saveQueryTask() {
   try { fs.writeFileSync(QUERY_FILE, JSON.stringify(queryTask, null, 2), "utf8"); } catch (_) {}
 }
 
-function saveCache() {
+function saveCache(explicit) {
   try {
-    fs.writeFileSync(CACHE_FILE, JSON.stringify({
+    // 2026-08-26：支持显式传入完整 cache（importCache 手动导入时用，避免 queryTask 为空时写空覆盖）
+    const data = explicit || {
       results: (queryTask && queryTask.results) || [],
       startDate: queryTask ? queryTask.startDate : "",
       endDate: queryTask ? queryTask.endDate : "",
       contentFilter: (queryTask && queryTask.contentFilter) || ["normal", "nsfw"],
       queryTime: Date.now()
-    }), "utf8");
+    };
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(data), "utf8");
   } catch (_) {}
 }
 
@@ -185,6 +187,60 @@ function stopSearch() {
   return { ok: true };
 }
 
+// 2026-08-26 用户要求：导出搜索记录（配合手动导入，备份/迁移用）
+// 返回完整 cache：{ results, startDate, endDate, contentFilter, queryTime, importedAt }
+function exportCache() {
+  return getCache() || { results: [], startDate: "", endDate: "", contentFilter: ["normal", "nsfw"], queryTime: 0 };
+}
+
+// 2026-08-26 用户要求：手动导入搜索记录（上传 JSON 文件）
+// 合并进 search_cache.json：按 modId 去重，**导入的覆盖原有的**（同名 modId 用导入数据替换），
+// 新 modId 追加。保存后刷新页面/恢复显示时会展示合并后的记录，不被后续新搜索覆盖。
+function importCache(records) {
+  if (!Array.isArray(records) || !records.length) {
+    return { ok: false, error: "没有有效的搜索记录（需为 JSON 数组）" };
+  }
+  // 校验 + 规范化字段
+  const norm = [];
+  const seen = new Set();
+  let bad = 0;
+  for (const r of records) {
+    const modId = String((r && (r.modId || r.id)) || "").trim();
+    if (!modId) { bad++; continue; }
+    if (seen.has(modId)) continue; // 导入文件内部去重（第一个为准）
+    seen.add(modId);
+    norm.push({
+      modId,
+      name: String((r && (r.name || r.modName || r._sName)) || ""),
+      author: String((r && (r.author || (r._aSubmitter && r._aSubmitter._sName))) || ""),
+      game: String((r && (r.game || r.gameName)) || ""),
+      profileUrl: String((r && (r.profileUrl || r.url)) || (modId ? `https://gamebanana.com/mods/${modId}` : "")),
+      dateAdded: Number((r && (r.dateAdded || r._tsDateAdded)) || 0) || 0,
+      dateModified: Number((r && (r.dateModified || r._tsDateModified)) || 0) || 0,
+      dateUpdated: Number((r && (r.dateUpdated || r._tsDateUpdated)) || 0) || 0,
+      isNsfw: !!(r && (r.isNsfw || r.nsfw))
+    });
+  }
+  if (!norm.length) return { ok: false, error: "导入文件中没有带 modId 的有效记录" };
+
+  // 合并进现有 cache：导入的覆盖原有的
+  const cache = getCache() || { results: [], startDate: "", endDate: "", contentFilter: ["normal", "nsfw"], queryTime: 0 };
+  const existing = (cache.results || []).slice();
+  const idxMap = new Map();
+  existing.forEach((r, i) => { if (r && r.modId) idxMap.set(String(r.modId), i); });
+  let replaced = 0, added = 0;
+  for (const r of norm) {
+    const i = idxMap.get(String(r.modId));
+    if (i !== undefined) { existing[i] = r; replaced++; }
+    else { idxMap.set(String(r.modId), existing.length); existing.push(r); added++; }
+  }
+  cache.results = existing;
+  cache.queryTime = Date.now();
+  cache.importedAt = Date.now();
+  saveCache(cache);
+  return { ok: true, added, replaced, total: existing.length };
+}
+
 function clearCache() {
   try { fs.unlinkSync(CACHE_FILE); } catch (_) {}
   return { ok: true };
@@ -201,5 +257,7 @@ module.exports = {
   getCache,
   stopSearch,
   clearCache,
+  importCache,
+  exportCache,
   restorePendingQuery
 };

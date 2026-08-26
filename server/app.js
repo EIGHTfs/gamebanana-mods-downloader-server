@@ -368,6 +368,25 @@ const server = http.createServer(async (req, res) => {
     if (method === "POST" && pathname === "/api/search/stop") return sendJson(res, 200, search.stopSearch());
     if (method === "GET" && pathname === "/api/search/cache") return sendJson(res, 200, { ok: true, cache: search.getCache() });
     if (method === "POST" && pathname === "/api/search/clear") return sendJson(res, 200, search.clearCache());
+    // 2026-08-26 用户要求：手动导入搜索记录（上传 JSON 数组，按 modId 合并，导入覆盖原有）
+    if (method === "POST" && pathname === "/api/search/import") {
+      const body = await readBody(req);
+      let records = body && body.records;
+      if (typeof records === "string") {
+        try { records = JSON.parse(records); } catch (_) { return sendJson(res, 400, { ok: false, error: "JSON 解析失败，请上传正确的搜索记录数组" }); }
+      }
+      if (body && body.json && !records) {
+        try { records = JSON.parse(body.json); } catch (_) { return sendJson(res, 400, { ok: false, error: "JSON 解析失败，请上传正确的搜索记录数组" }); }
+      }
+      return sendJson(res, 200, search.importCache(records));
+    }
+    // 2026-08-26 用户要求：导出搜索记录（当前 cache 完整 JSON，前端下载为文件）
+    if (method === "GET" && pathname === "/api/search/export") {
+      const cache = search.exportCache();
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="gbmd-search-records-${new Date().toISOString().slice(0, 10)}.json"`);
+      return res.end(JSON.stringify(cache, null, 2));
+    }
 
     // ---- 下载（四步流程：生成HTML → 查重归位 → 整理 → 正式下载）----
     if (method === "POST" && pathname === "/api/download") {

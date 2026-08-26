@@ -120,6 +120,9 @@ try {
         <button class="primary" id="searchBtn" type="button">查询 Mod</button>
         <button class="ghost" id="stopSearchBtn" type="button" style="display:none">停止搜索</button>
         <button class="ghost" id="clearSearchBtn" type="button">清空列表</button>
+        <button class="ghost" id="exportSearchBtn" type="button" title="导出当前搜索记录为 JSON 文件（备份/迁移用）">导出记录</button>
+        <button class="ghost" id="importSearchBtn" type="button" title="上传 JSON 文件导入搜索记录（按 modId 合并，导入覆盖原有）">导入记录</button>
+        <input type="file" id="importSearchFile" accept=".json,application/json" style="display:none">
       </div>
       <div class="status" id="searchStatus"></div>
     </div>
@@ -243,7 +246,7 @@ try {
   </div>
 </div>
 
-<script src="app.js?v=20260826-ui3"></script>
+<script src="app.js?v=20260826-import"></script>
 
 <!-- 目录选择弹窗（设置页「读取本地选择」下载路径） -->
 <div class="modal-mask" id="browseMask" style="display:none">

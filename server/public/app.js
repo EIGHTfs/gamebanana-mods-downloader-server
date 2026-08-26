@@ -183,6 +183,53 @@ function bindSearch() {
     $("#searchStatus").textContent = "列表已清空";
   });
 
+  // 2026-08-26 用户要求：导出/导入搜索记录（备份、迁移、手动恢复）
+  $("#exportSearchBtn").addEventListener("click", async () => {
+    try {
+      const r = await fetch("/api/search/export");
+      if (r.status === 401) { location.href = "/login.html"; return; }
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "gbmd-search-records-" + new Date().toISOString().slice(0, 10) + ".json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      $("#searchStatus").textContent = "已导出搜索记录 JSON";
+    } catch (e) {
+      $("#searchStatus").textContent = "导出失败: " + e.message;
+      $("#searchStatus").className = "status err";
+    }
+  });
+
+  $("#importSearchBtn").addEventListener("click", () => { $("#importSearchFile").click(); });
+  $("#importSearchFile").addEventListener("change", async (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    $("#searchStatus").textContent = "正在导入 " + file.name + " …";
+    try {
+      const text = await file.text();
+      let json = null;
+      try { json = JSON.parse(text); } catch (_) {}
+      let records = null;
+      if (Array.isArray(json)) records = json;
+      else if (json && Array.isArray(json.results)) records = json.results;
+      else if (json && Array.isArray(json.records)) records = json.records;
+      if (!records) { $("#searchStatus").textContent = "导入失败: 文件里找不到记录数组（需为 JSON 数组或 {results:[...]}）"; $("#searchStatus").className = "status err"; ev.target.value = ""; return; }
+      const r = await api("/api/search/import", "POST", { records });
+      if (!r.ok) throw new Error(r.error || "导入失败");
+      // 刷新显示：重新拉取合并后的 cache
+      const c = await api("/api/search/cache");
+      if (c.cache && c.cache.results) { searchResults = c.cache.results; renderSearchResults(); }
+      $("#searchStatus").textContent = `✅ 导入完成：新增 ${r.added} 条，覆盖 ${r.replaced} 条，当前共 ${r.total} 条`;
+      $("#searchStatus").className = "status";
+    } catch (e) {
+      $("#searchStatus").textContent = "导入失败: " + e.message;
+      $("#searchStatus").className = "status err";
+    } finally {
+      ev.target.value = ""; // 允许再次选择同一文件
+    }
+  });
+
   $("#selectAllBtn").addEventListener("click", () => {
     document.querySelectorAll("#searchResultList input[type=checkbox]").forEach((cb) => (cb.checked = true));
   });

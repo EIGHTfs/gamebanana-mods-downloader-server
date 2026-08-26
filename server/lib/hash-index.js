@@ -267,7 +267,7 @@ async function rebuild() {
             //   外部 mod 遗留文件 → 移入本游戏根垃圾桶（.trash）。移入保留原名，
             //   将来下载其真正所属 mod 时 trash-restore 按原名自动找回归位。
             try {
-              const org = organize.organizeDir(dir, path.join(root, ".trash"));
+              const org = organize.organizeDir(dir, path.join(root, ".trash"), gbMeta.modId);
               if (org.moved && org.moved.length) {
                 console.log("[rebuild-organize]", (dir.split("/Mods/")[1] || dir).slice(0, 50), "→ 移出", org.moved.length, "个外部文件");
               }

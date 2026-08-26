@@ -712,8 +712,38 @@ async function prepareMod(url) {
   //   移入垃圾桶的历史 md5 名文件会被 trash-restore 按内容 hash 当成「本 mod 丢失文件」捞回，
   //   导致移出又找回（autoOrganized 报告为 0，目录残留 md5 名副本）。先找回本 mod 的、
   //   再清走外部遗留，互不干扰。
+  //   2026-08-26 修复（用户指出严重问题：作者更新只保留新版本，旧版本 zip 被误清）：
+  //   organizeDir 传当前 modId，name-index 反查命中同 modId 的旧版本文件保留（org.kept），
+  //   并追加进 HTML files legacy 记录——下次不再被当外部文件清理。
   try {
-    const org = organize.organizeDir(finalDir, trashRoot);
+    const org = organize.organizeDir(finalDir, trashRoot, mod.modId);
+    if (org.kept && org.kept.length) {
+      // 旧版本文件（GB 页面已下架，但本地保留）→ 追加进 HTML 记录
+      let htmlChanged = false;
+      const diskObj = readIndexObj(finalDir) || obj;
+      for (const k of org.kept) {
+        const base = k.endsWith(".gbmd.part") ? k.slice(0, -(".gbmd.part".length)) : k;
+        const lower = String(base).toLowerCase();
+        const inFiles = (diskObj.files || []).some((x) => x && String(x.file).toLowerCase() === lower);
+        const inImgs = (diskObj.images || []).some((x) => x && (String(x.file || "").toLowerCase() === lower || String(x.gbFile || "").toLowerCase() === lower));
+        const inGifs = (diskObj.gifs || []).some((x) => x && String(x.file || "").toLowerCase() === lower);
+        if (!inFiles && !inImgs && !inGifs) {
+          let st = null;
+          try { st = fs.statSync(path.join(finalDir, base)); } catch (_) {}
+          if (/.(zip|rar|7z|tar|gz)$/i.test(base)) {
+            diskObj.files = diskObj.files || [];
+            diskObj.files.push({ file: base, url: "", size: st ? st.size : 0, gbMd5: "", hash: "", description: "旧版本文件（GB 已下架，本地保留）", legacy: true });
+            htmlChanged = true;
+          } else if (isImageExt(base)) {
+            diskObj.images = diskObj.images || [];
+            diskObj.images.push({ file: base, gbFile: base, url: "", hash: "" });
+            htmlChanged = true;
+          }
+        }
+      }
+      if (htmlChanged) writeIndexHtml(finalDir, diskObj);
+      console.log("[auto-organize-keep]", (finalDir.split("/Mods/")[1] || finalDir).slice(0, 50), "→ 保留旧版本", org.kept.length, "个（已追加 HTML 记录）");
+    }
     if (org.moved && org.moved.length) {
       report.step3.autoOrganized = org.moved;
       console.log("[auto-organize]", (finalDir.split("/Mods/")[1] || finalDir).slice(0, 50), "→ 移出", org.moved.length, "个外部文件");

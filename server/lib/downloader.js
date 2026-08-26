@@ -775,7 +775,7 @@ function downloadToFile(item, settings, onProgress) {
             stallCount = 0;
             stallLast = cur;
           }
-        }, 20000);
+        }, 2000); // 2026-08-26 缩短到 2s：停止/暂停 2 秒内中断下载（原 20s 太慢），停滞检测仍 2 次×2s
 
         res.on("data", (chunk) => {
           received += chunk.length;
@@ -1030,14 +1030,20 @@ async function doDownloadLoop() {
     // ---------- 收尾 ----------
     if (!task) return;
     if (task.abort || task.pause) {
-      task.status = task.abort ? "stopped" : "paused";
-      task.message = task.abort ? "已终止" : "已暂停";
+      const wasAbort = task.abort;
+      task.status = wasAbort ? "stopped" : "paused";
+      task.message = wasAbort ? "已终止" : "已暂停";
       task.abort = false;
       task.pause = false;
       task.currentItem = null;
       task.preparingItem = null;
       task.activeItems = [];
       task.updatedAt = Date.now();
+      if (wasAbort) {
+        // 2026-08-26 停止后彻底清空：前端列表消失（显示"暂无任务"）
+        task = null;
+        return;
+      }
       saveTask();
       return;
     }
@@ -1211,6 +1217,11 @@ function resumeTask() {
 
 function stopTask() {
   if (!task) return { ok: false, error: "没有任务" };
+  // 2026-08-26 修复（用户反馈：停止后实际还在下载）：
+  //   原来设 abort=true 后立即 task=null——下载循环的 abort 检查是「task && task.abort」，
+  //   task 变 null 后检查恒 false，正在下载的请求不会中断，继续下完。
+  //   正确：设 abort=true 保留 task 引用（下载循环会 destroy 活跃请求），
+  //   循环退出（收尾处理 abort）后再由循环把 task 置 null/清理。
   task.abort = true;
   task.pause = false;
   task.status = "stopped";
@@ -1220,7 +1231,7 @@ function stopTask() {
   task.preparingItem = null;
   task.updatedAt = Date.now();
   try { fs.unlinkSync(TASK_FILE); } catch (_) {}
-  task = null;
+  // 不再立即 task=null——等 doDownloadLoop 收尾（检测 abort → destroy 请求 → 清理）
   modDirByItem.clear();
   return { ok: true };
 }
@@ -1355,22 +1366,18 @@ function restorePendingTask() {
   } catch (_) { task = null; }
   if (!task) return;
   const hasItems = Array.isArray(task.items) && task.items.length > 0;
-  if (task.status === "running" && hasItems) {
-    task.pause = false;
-    task.abort = false;
-    task.activeItems = [];
-    task.currentItem = null;
-    task.preparingItem = null;
-    task.message = "重启后继续…";
-    saveTask();
-    runDownloadLoop();
-  } else if ((task.status === "paused" || task.status === "done") && hasItems) {
+  // 2026-08-26 修复（用户反馈：重启后搜索的巨量任务自动恢复海量下载）：
+  //   重启后一律恢复为「暂停」状态——保留列表供查看/手动继续，不自动开始下载。
+  //   防止搜索批量（几千个 mod）重启后自动海量下载。
+  if ((task.status === "running" || task.status === "paused" || task.status === "done") && hasItems) {
     // 保留列表：paused 停在暂停态，done 保持完成态，前端可见
     task.activeItems = [];
     task.currentItem = null;
     task.preparingItem = null;
-    if (task.status === "paused") task.message = "已暂停（重启后保留）";
-    else task.message = task.message || "下载完成";
+    task.status = "paused";
+    task.pause = true;
+    task.abort = false;
+    task.message = "已暂停（重启后保留，点「继续」恢复下载）";
     saveTask();
   } else {
     // preparing 且无下载项 → 残留，清理

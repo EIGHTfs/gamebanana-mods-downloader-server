@@ -149,9 +149,17 @@ function bindSearch() {
     $("#searchBtn").disabled = true;
     $("#searchStatus").textContent = "启动搜索…";
     try {
+      // 2026-08-26 修复（用户反馈：中途搜了别的没覆盖旧搜索）：
+      //   先停掉旧搜索（避免「已有搜索任务」报错 + 旧结果残留），再启动新搜索
+      try { await api("/api/search/stop", "POST", {}); } catch (_) {}
+      // 清空旧的搜索结果显示
+      searchResults = [];
+      const resEl = $("#searchResult");
+      if (resEl) resEl.innerHTML = "";
       const r = await api("/api/search", "POST", { startDate, endDate, contentFilter, games: [game] });
       if (!r.ok) throw new Error(r.error || "启动失败");
       $("#searchStatus").textContent = "搜索中…（后台运行，可切换标签）";
+      $("#searchStatus").className = "status";
       $("#stopSearchBtn").style.display = "inline-block";
       startSearchPoll();
     } catch (e) {
@@ -275,10 +283,27 @@ function renderSearchResults() {
 
 // ---------- 下载进度 ----------
 function bindProgress() {
-  $("#pauseBtn").addEventListener("click", () => api("/api/task/pause", "POST", {}));
-  $("#resumeBtn").addEventListener("click", () => api("/api/task/resume", "POST", {}));
-  $("#stopBtn").addEventListener("click", () => {
-    if (confirm("确定终止下载吗？已下载的文件会保留。")) api("/api/task/stop", "POST", {});
+  // 2026-08-26 修复：暂停/继续/停止后立即刷新列表（不等 2s 轮询）+ 停止清空列表
+  async function refreshTask() {
+    try {
+      const t = await api("/api/task");
+      renderTask(t.task);
+    } catch (_) {}
+  }
+  $("#pauseBtn").addEventListener("click", async () => {
+    const r = await api("/api/task/pause", "POST", {});
+    if (r && r.ok) refreshTask();
+  });
+  $("#resumeBtn").addEventListener("click", async () => {
+    const r = await api("/api/task/resume", "POST", {});
+    if (r && r.ok) refreshTask();
+  });
+  $("#stopBtn").addEventListener("click", async () => {
+    if (!confirm("确定终止下载吗？已下载的文件会保留。")) return;
+    const r = await api("/api/task/stop", "POST", {});
+    if (r && r.ok) {
+      refreshTask(); // 立即刷新（task=null → 列表清空显示"暂无任务"）
+    }
   });
   $("#retryBtn").addEventListener("click", async () => {
     const r = await api("/api/task/retry-failed", "POST", {});
@@ -1089,11 +1114,9 @@ async function init() {
   loadGameSelects();
   await loadSettings();
   try {
-    const c = await api("/api/search/cache");
-    if (c.cache && c.cache.results && c.cache.results.length) {
-      searchResults = c.cache.results;
-      renderSearchResults();
-    }
+    // 2026-08-26 修复（用户反馈：重启后恢复成之前搜的巨量任务）：
+    //   启动时【不】自动恢复搜索缓存（巨量搜索结果列表不再出现）。
+    //   只恢复「搜索正在后台运行」的状态：若 search-status 是 running 才继续轮询
     const st = await api("/api/search-status");
     if (st.task && st.task.status === "running") {
       $("#searchBtn").disabled = true;

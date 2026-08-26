@@ -911,7 +911,21 @@ async function doDownloadLoop() {
     // ---------- 生产者：逐个 mod 准备（第一步→第二步→第三步）----------
     const produce = async () => {
       while (task && !task.abort && !task.pause) {
-        if (task.buildIndex >= (task.pendingMods || []).length) break;
+        // 2026-08-26 追加任务立刻开始：pendingMods 处理完不退出——若还有下载项在跑，
+        //   等待新追加（task.pendingMods 增长）继续生产；全部完成才退出
+        if (task.buildIndex >= (task.pendingMods || []).length) {
+          // 2026-08-26 追加任务立刻开始：有活跃下载/未完成项 → produce 等待新追加
+          const stillActive = (task.activeItems || []).length > 0 || ((task.items || []).length > 0 && resultsByIndex.size < (task.items || []).length);
+          if (stillActive) {
+            task.waitingAppend = true;
+            await new Promise((r) => setTimeout(r, 300));
+            continue; // 新追加后 buildIndex < pendingMods.length → 继续生产
+          }
+          // 无活跃下载且无未完成项 → 任务完成，produce 退出（等 consume 也退出 → 收尾 done）
+          task.waitingAppend = false;
+          break;
+        }
+        task.waitingAppend = false;
         const myIdx = task.buildIndex;
         task.buildIndex++;
         const modRef = task.pendingMods[myIdx];
@@ -957,8 +971,8 @@ async function doDownloadLoop() {
                (resultsByIndex.has(downloadIdx) || activeIdx.has(downloadIdx))) downloadIdx++;
         const idx = downloadIdx;
         if (idx >= (task.items || []).length) {
-          // 生产者未完成则等待
-          const stillProducing = task.buildIndex < (task.pendingMods || []).length || task.preparingItem;
+          // 生产者未完成则等待；produce 在等追加（waitingAppend）也不退出
+          const stillProducing = task.buildIndex < (task.pendingMods || []).length || task.preparingItem || task.waitingAppend;
           if (stillProducing) { await new Promise((r) => setTimeout(r, 200)); continue; }
           return;
         }

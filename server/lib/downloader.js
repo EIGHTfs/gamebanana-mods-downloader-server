@@ -1323,7 +1323,10 @@ function retryFailed() {
   return { ok: true, retried: failedIdx.length, message: `已重新入队 ${failedIdx.length} 个失败项` };
 }
 
-// 启动时恢复未完成任务（只恢复 running 有实际下载项；preparing 残留丢弃）
+// 启动时恢复任务（2026-08-26 修复：重启后下载列表不应消失）
+//   · running → 继续下载
+//   · paused / done → 恢复任务（列表保留在网页，可继续/重试/查看历史）
+//   · preparing（无任何下载项）→ 清理残留
 function restorePendingTask() {
   try {
     if (fs.existsSync(TASK_FILE)) {
@@ -1331,7 +1334,8 @@ function restorePendingTask() {
     }
   } catch (_) { task = null; }
   if (!task) return;
-  if (task.status === "running" && Array.isArray(task.items) && task.items.length) {
+  const hasItems = Array.isArray(task.items) && task.items.length > 0;
+  if (task.status === "running" && hasItems) {
     task.pause = false;
     task.abort = false;
     task.activeItems = [];
@@ -1340,7 +1344,16 @@ function restorePendingTask() {
     task.message = "重启后继续…";
     saveTask();
     runDownloadLoop();
-  } else if (task.status === "preparing" || task.status === "paused") {
+  } else if ((task.status === "paused" || task.status === "done") && hasItems) {
+    // 保留列表：paused 停在暂停态，done 保持完成态，前端可见
+    task.activeItems = [];
+    task.currentItem = null;
+    task.preparingItem = null;
+    if (task.status === "paused") task.message = "已暂停（重启后保留）";
+    else task.message = task.message || "下载完成";
+    saveTask();
+  } else {
+    // preparing 且无下载项 → 残留，清理
     task.status = "stopped";
     task.message = "已终止（启动时清理残留任务）";
     try { fs.unlinkSync(TASK_FILE); } catch (_) {}

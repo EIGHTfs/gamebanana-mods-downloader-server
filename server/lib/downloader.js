@@ -593,18 +593,6 @@ async function prepareMod(url) {
   }
   writeIndexHtml(finalDir, obj);
 
-  // ---- 2026-08-26 用户要求：下载时自动整理（不在 HTML 文件列表的文件 → 移入垃圾桶）----
-  // 判定（用户原话）：HTML 现在会记住历史文件（legacy 追加合并），真正属于本 mod 的文件
-  //   都在列表里；不在列表的 = 错误归类的外部 mod 遗留 → 移入游戏根垃圾桶（.trash）。
-  //   移入时保留 GB 原名 → 将来下载其真正所属 mod 时 trash-restore 按原名自动找回归位。
-  try {
-    const org = organize.organizeDir(finalDir, trashRoot);
-    if (org.moved && org.moved.length) {
-      report.step3.autoOrganized = org.moved;
-      console.log("[auto-organize]", (finalDir.split("/Mods/")[1] || finalDir).slice(0, 50), "→ 移出", org.moved.length, "个外部文件");
-    }
-  } catch (_) {}
-
   // ---- 第三步：整理阶段（part 文件 + 图片 md5 重命名去重）----
   const root = target.root;
   report.step3 = await integrityCheck(finalDir, obj, root);
@@ -715,6 +703,22 @@ async function prepareMod(url) {
     report.step3.restored = restored;
     console.log("[trash-restore]", (finalDir.split("/Mods/")[1] || finalDir).slice(0, 40), "←", restored.length, "个文件");
   }
+
+  // ---- 2026-08-26 用户要求：下载时自动整理（不在 HTML 文件列表的文件 → 移入垃圾桶）----
+  // 判定（用户原话）：HTML 现在会记住历史文件（legacy 追加合并），真正属于本 mod 的文件
+  //   都在列表里；不在列表的 = 错误归类的外部 mod 遗留 → 移入游戏根垃圾桶（.trash）。
+  //   移入时保留 GB 原名 → 将来下载其真正所属 mod 时 trash-restore 按原名自动找回归位。
+  //   2026-08-26 修复（实测 696913）：必须在 trash-restore 之后执行——否则 auto-organize
+  //   移入垃圾桶的历史 md5 名文件会被 trash-restore 按内容 hash 当成「本 mod 丢失文件」捞回，
+  //   导致移出又找回（autoOrganized 报告为 0，目录残留 md5 名副本）。先找回本 mod 的、
+  //   再清走外部遗留，互不干扰。
+  try {
+    const org = organize.organizeDir(finalDir, trashRoot);
+    if (org.moved && org.moved.length) {
+      report.step3.autoOrganized = org.moved;
+      console.log("[auto-organize]", (finalDir.split("/Mods/")[1] || finalDir).slice(0, 50), "→ 移出", org.moved.length, "个外部文件");
+    }
+  } catch (_) {}
 
   // ---- 第四步：构建下载项（标记已存在）----
   const items = buildDownloadItems(mod, finalDir, obj);

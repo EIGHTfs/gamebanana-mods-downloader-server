@@ -1,0 +1,31 @@
+# 敏感/运行态数据
+server/config.json
+server/*.log
+server/sessions.json
+server/download_task.json
+server/search_cache.json
+server/search_task.json
+# hash 反查：本地表 + HTML 原名表（本机下载/反查记录，仅本部署可见；GB 信息表 json/gb-hash-index.json 正常提交）
+json/local-hash-index.json
+json/html-name-index.json
+node_modules/
+.DS_Store
+
+# 真实游戏配置（含本地下载路径，敏感）——不上传；仓库只保留 gamebanana.com.json.example 示例
+json/gamebanana.com.json
+# 构建产物（release 由用户自行分发）
+dist/
+
+# 群晖 @eaDir 元数据
+@eaDir/
+**/@eaDir/
+*.@SynoEAStream
+
+# 构建产物（release 由用户自行分发）
+dist/
+release/
+
+# 备份/日志残留
+server/*.bak-*
+server/*.log.bak-*
+*.bak

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>gbmd · GameBanana Mod 下载器</title>
+<link rel="stylesheet" href="style.css">
+<script>
+// 2026-08-26 用户要求：蓝白=白天模式（默认），香蕉风深色=夜间模式，可切换；进页面立即应用防闪烁
+try {
+  const th = localStorage.getItem("gbmd-theme");
+  if (th === "night") document.documentElement.setAttribute("data-theme", "night");
+} catch (_) {}
+</script>
+</head>
+<body>
+<header>
+  <div style="display:flex;align-items:center">
+    <h1>🍌 gbmd</h1>
+    <span class="sub">GameBanana Mod Downloader</span>
+  </div>
+  <div class="right">
+    <span id="serverTime" class="sub"></span>
+    <button class="ghost" id="themeBtn" type="button" title="切换白天/夜间模式">🌙 夜间</button>
+    <button class="ghost" id="logoutBtn" type="button">退出登录</button>
+  </div>
+</header>
+
+<!-- 2026-08-26 用户要求：未设置密码 → 只警告、可直接使用 -->
+<div id="noPwdWarn" style="display:none;background:#fff3cd;color:#664d03;padding:8px 16px;text-align:center;font-size:13px">
+  ⚠️ 尚未设置访问密码 —— 当前局域网内任何人可访问本服务（设置页可修改密码）。
+</div>
+
+<div class="container">
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="download">⬇ 下载</div>
+    <div class="tab" data-tab="progress">📊 下载进度</div>
+    <div class="tab" data-tab="search">🔍 搜索</div>
+    <div class="tab" data-tab="settings">⚙ 设置</div>
+  </div>
+
+  <!-- ============ 下载 ============ -->
+  <div class="tab-panel active" id="panel-download">
+    <div class="card">
+      <h2>下载 Mod</h2>
+      <p class="hint">每行一个 Mod 链接（https://gamebanana.com/mods/704164）或纯数字 id（704164）</p>
+      <textarea id="batchInput" rows="8" placeholder="https://gamebanana.com/mods/704164&#10;704164" style="width:100%"></textarea>
+      <div class="row mt">
+        <button class="primary" id="batchBtn" type="button">开始下载</button>
+        <button class="ghost" id="clearBtn" type="button">清空</button>
+      </div>
+      <div class="status" id="batchStatus"></div>
+    </div>
+    <div class="card">
+      <h2>下载流程说明</h2>
+      <p class="hint">① 根据香蕉网网页生成 HTML（作者/游戏/分类/文件 md5/图片名/gif），并计算下载路径（映射：Characters→角色、Weapons→武器、Skins→空；角色目录「英文 – 中文」；Characters/Skins → 角色/.角色）<br>
+      ② 在整个游戏根目录搜索压缩包名/图片名，存在于其他文件夹则 mv 到计算出的完整下载路径，HTML 存入<br>
+      ③ 整理：清理 .gbmd.part（仅 part 存在则断点续传），图片重命名为 hash 值，重复图片进根目录垃圾桶<br>
+      ④ 正式下载缺失文件（不改原始文件名，非法字符用空格替换）</p>
+    </div>
+  </div>
+
+  <!-- ============ 下载进度 ============ -->
+  <div class="tab-panel" id="panel-progress">
+    <div class="card">
+      <h2>下载进度</h2>
+      <div class="row">
+        <span id="taskState" style="font-weight:600">无任务</span>
+        <button id="pauseBtn" type="button" disabled>暂停</button>
+        <button id="resumeBtn" type="button" disabled>继续</button>
+        <button id="stopBtn" type="button" disabled class="danger">终止</button>
+        <button id="retryBtn" type="button" disabled class="ghost">重试失败</button>
+        <button id="clearFailBtn" type="button" class="ghost" title="一键移除当前下载失败的列表（一次性，不影响之后新出现的失败）">清除失败</button>
+      </div>
+      <div class="progress-wrap mt">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      </div>
+      <div id="taskMeta"></div>
+      <div id="activeList" style="margin-top:6px"></div>
+      <div class="row mt">
+        <label>并发数 <input type="number" id="concurrencyInput" min="1" max="16" value="4" style="width:70px"></label>
+        <button class="ghost" id="concurrencyBtn" type="button">应用</button>
+        <span class="hint">（仅此一处可改并发数）</span>
+      </div>
+      <div id="taskList" class="mt"></div>
+    </div>
+  </div>
+
+  <!-- ============ 搜索 ============ -->
+  <div class="tab-panel" id="panel-search">
+    <div class="card">
+      <h2>关键词搜索 Mod</h2>
+      <p class="hint">输入关键词（支持中文/角色名/别号，自动归一到英文，如「桑多涅」「吉约丹小姐」→ Sandrone），结果可勾选批量下载</p>
+      <div class="row">
+        <label>游戏
+          <select id="searchGameSelect">
+            <option value="">— 请选择游戏 —</option>
+          </select>
+        </label>
+        <label>关键词 <input type="text" id="kwInput" placeholder="如 Sandrone、桑多涅、Lingerie" style="width:240px"></label>
+        <button class="primary" id="kwSearchBtn" type="button">搜索</button>
+      </div>
+      <div class="status" id="kwStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>按时间搜索 Mod</h2>
+      <p class="hint">按「新增 / 修改 / 更新」三个时间字段任意命中筛选指定游戏、指定时间范围内的 mod（后台每秒 1 页）</p>
+      <div class="row mt">
+        <label>开始日期 <input type="date" id="searchStart"></label>
+        <button class="ghost" id="earliestBtn" type="button" title="设为最早（2000-01-01，从第一个 mod 开始搜）">最早</button>
+        <label>结束日期 <input type="date" id="searchEnd"></label>
+      </div>
+      <div class="row mt">
+        <label><input type="checkbox" id="filterNormal" checked> 普通</label>
+        <label><input type="checkbox" id="filterNsfw" checked> NSFW</label>
+      </div>
+      <div class="row mt">
+        <button class="primary" id="searchBtn" type="button">查询 Mod</button>
+        <button class="ghost" id="stopSearchBtn" type="button" style="display:none">停止搜索</button>
+        <button class="ghost" id="clearSearchBtn" type="button">清空列表</button>
+      </div>
+      <div class="status" id="searchStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>搜索结果 <span id="resultCount" class="sub"></span></h2>
+      <div class="row" style="margin-bottom:8px">
+        <button class="primary" id="selectAllBtn" type="button">全选</button>
+        <button class="ghost" id="selectNoneBtn" type="button">全不选</button>
+        <button class="success" id="downloadSelectedBtn" type="button">下载勾选项</button>
+      </div>
+      <div class="result-list" id="searchResultList"><div class="empty">尚未搜索</div></div>
+    </div>
+  </div>
+
+  <!-- ============ 设置 ============ -->
+  <div class="tab-panel" id="panel-settings">
+    <div class="card">
+      <h2>游戏下载路径（gamebanana.com.json）</h2>
+      <p class="hint">网页设置读取 gamebanana.com.json：游戏名 + 香蕉网 id + 下载目录路径根目录；下载时自动找到游戏对应映射文件（mapping/&lt;游戏名&gt;.json）计算下载路径。📂 按钮 = 读取本地选择目录</p>
+      <div id="rootMapRows"></div>
+      <div class="row mt">
+        <button class="primary" id="saveGamesBtn" type="button">保存下载路径</button>
+        <span class="status" id="gamesStatus"></span>
+      </div>
+
+      <!-- 2026-08-26 用户要求：输入香蕉网 id 添加游戏，游戏名自动获取 -->
+      <h3 style="margin:14px 0 8px;font-size:14px;color:var(--primary)">➕ 添加游戏（输入香蕉网 id，游戏名自动获取）</h3>
+      <div class="row">
+        <label>香蕉网游戏 id <input type="number" id="addGameId" placeholder="8552（原神）" style="width:110px"></label>
+        <button class="primary" id="fetchGameBtn" type="button">获取游戏名</button>
+        <span class="status" id="addGameStatus"></span>
+      </div>
+      <div class="row mt" id="addGamePreview" style="display:none">
+        <span id="addGameName" style="font-weight:600"></span>
+        <button class="success" id="addGameConfirmBtn" type="button">添加到游戏列表</button>
+      </div>
+    </div>
+
+    <!-- 2026-08-26 用户要求：文件夹合并放进设置里面 -->
+    <div class="card">
+      <h2>文件夹合并（按映射重命名角色目录）</h2>
+      <p class="hint">例：文件夹 <b>Sandrone</b> 根据映射重命名为 <b>Sandrone – 桑多涅</b>；同角色已有「英文 – 中文」目录时内容并入，空目录进根目录 .trash（可恢复）</p>
+      <div class="row">
+        <label>游戏
+          <select id="mmGameSelect">
+            <option value="">— 请选择游戏 —</option>
+          </select>
+        </label>
+        <button id="mmMergeBtn" type="button">预览合并计划</button>
+        <button id="mmMergeGoBtn" type="button">确认执行</button>
+        <span class="status" id="mmMergeStatus"></span>
+      </div>
+      <div id="mmMergePlan"></div>
+
+      <!-- 2026-08-26 用户要求：手动添加映射（选游戏/选仓库/填英文名+中文名 → 写入 mapping JSON） -->
+      <h3 style="margin:14px 0 8px;font-size:14px;color:var(--primary)">➕ 手动添加角色映射</h3>
+      <div class="row">
+        <label>游戏
+          <select id="mmAddGame"><option value="">— 请选择游戏 —</option></select>
+        </label>
+        <label>仓库目录
+          <select id="mmAddWarehouse" disabled><option value="">— 请先选择游戏 —</option></select>
+        </label>
+        <div style="position:relative">
+          <label>英文名 <input type="text" id="mmAddEn" placeholder="输入过滤，如 Od → Odette" style="width:170px" disabled autocomplete="off"></label>
+          <div class="combo-list" id="mmComboList" style="display:none"></div>
+        </div>
+        <label>中文名 <input type="text" id="mmAddZh" placeholder="奥黛塔" style="width:110px" disabled></label>
+        <button class="primary" id="mmAddBtn" type="button">添加映射</button>
+        <span class="status" id="mmAddStatus"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>下载选项</h2>
+      <div class="row">
+        <label>GameBanana 登录 Cookie（可选，NSFW/需登录下载用；sess+rmc 完整串）
+          <input type="text" id="gbCookie" placeholder="sess=xxxx; rmc=xxxx" style="width:100%">
+        </label>
+      </div>
+      <div class="row mt">
+        <button id="gbLoginCheckBtn" type="button">检测登录状态</button>
+        <span id="gbLoginStatus"></span>
+      </div>
+      <p class="hint mt">（并发数在「下载进度」页修改，仅此一处）</p>
+    </div>
+
+    <div class="card">
+      <h2>HTML 反查</h2>
+      <p class="hint">输入文件 hash（md5）<b>或图片原始短名</b>（GB 原名，如 <code>69b46e18405cc.jpg</code>），反查它属于哪个 mod。三索引：GB 信息表（hash → 线上 mod 信息）+ 本地表（hash → 实际下载位置）+ HTML 表（GB 原名短名 → mod，扫描全部 description.html）。</p>
+      <div class="row">
+        <input type="text" id="hashInput" placeholder="hash 或图片短名，如 69b46e18405cc.jpg / 92cf563c..." style="width:340px">
+        <button id="hashQueryBtn" type="button">查询</button>
+        <button id="hashRebuildBtn" type="button" class="ghost" title="下载了新 mod 后重建索引（启动时也会自动建）">重建索引</button>
+      </div>
+      <div class="status" id="hashStatus"></div>
+      <div id="hashResult"></div>
+      <hr style="border:none;border-top:1px dashed var(--border);margin:12px 0">
+      <div class="row">
+        <input type="text" id="hashSearchInput" placeholder="按 mod 名 / 作者搜索（离线目录，如 Odette / monsoon04）" style="width:340px">
+        <button id="hashSearchBtn" type="button">搜索</button>
+      </div>
+      <div class="status" id="hashSearchStatus"></div>
+      <div id="hashSearchResult"></div>
+    </div>
+
+    <div class="card">
+      <h2>修改密码</h2>
+      <div class="row">
+        <input type="password" id="newPwd" placeholder="新密码（至少 4 位）">
+        <button class="primary" id="changePwdBtn" type="button">修改</button>
+      </div>
+      <div class="status" id="pwdStatus"></div>
+    </div>
+
+    <div class="row mt">
+      <button class="primary" id="saveSettingsBtn" type="button">保存设置</button>
+      <div class="status" id="settingsStatus"></div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js?v=20260826-ui3"></script>
+
+<!-- 目录选择弹窗（设置页「读取本地选择」下载路径） -->
+<div class="modal-mask" id="browseMask" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <b>选择下载目录</b>
+      <button class="ghost" id="browseClose" type="button">✕</button>
+    </div>
+    <div class="browse-path" id="browsePath"></div>
+    <div class="browse-list" id="browseList"></div>
+    <div class="row mt">
+      <button class="primary" id="browseSelect" type="button">选择此目录</button>
+      <span class="hint" id="browseHint"></span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

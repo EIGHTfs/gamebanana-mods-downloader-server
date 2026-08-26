@@ -1,0 +1,27 @@
+{
+  "Honkai Impact 3rd": {
+    "id": 10349,
+    "cn": "崩坏 3",
+    "downloadPath": "/path/to/your/Mods/Honkai Impact 3/"
+  },
+  "Genshin Impact": {
+    "id": 8552,
+    "cn": "原神",
+    "downloadPath": "/path/to/your/Mods/Genshin Impact/"
+  },
+  "Honkai Star Rail": {
+    "id": 18366,
+    "cn": "星穹铁道",
+    "downloadPath": "/path/to/your/Mods/Star Rail/"
+  },
+  "Zenless Zone Zero": {
+    "id": 19567,
+    "cn": "绝区零",
+    "downloadPath": "/path/to/your/Mods/Zenless Zone Zero/"
+  },
+  "Wuthering Waves": {
+    "id": 20357,
+    "cn": "鸣潮",
+    "downloadPath": "/path/to/your/Mods/Wuthering Waves/"
+  }
+}

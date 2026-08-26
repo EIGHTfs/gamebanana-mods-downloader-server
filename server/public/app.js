@@ -1,0 +1,1053 @@
+// ============================================================
+// gbmd - 前端主逻辑（tab + 轮询）
+// ============================================================
+"use strict";
+
+const $ = (sel) => document.querySelector(sel);
+
+let settings = null;
+let searchResults = [];
+let searchPollTimer = null;
+let taskPollTimer = null;
+
+async function api(path, method = "GET", body) {
+  const opts = { method, headers: {} };
+  if (body !== undefined) {
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
+  }
+  const r = await fetch(path, opts);
+  if (r.status === 401) {
+    location.href = "/login.html";
+    throw new Error("未登录");
+  }
+  return r.json();
+}
+
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function fmtTs(ts) {
+  if (!ts) return "-";
+  const d = new Date(ts * 1000);
+  return isNaN(d.getTime()) ? "-" : d.toLocaleString("zh-CN", { hour12: false });
+}
+
+function typeIcon(t) {
+  switch (t) {
+    case "file": return "📦";
+    case "image": return "🖼";
+    case "blocked": return "🚫";
+    case "skipped": return "⏭";
+    case "error": return "⚠";
+    default: return "•";
+  }
+}
+
+function typeLabel(t) {
+  switch (t) {
+    case "file": return "文件";
+    case "image": return "图片";
+    case "blocked": return "已屏蔽";
+    case "skipped": return "已忽略";
+    case "error": return "错误";
+    default: return t;
+  }
+}
+
+// ---------- Tab 切换 ----------
+function bindTabs() {
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+      tab.classList.add("active");
+      $("#panel-" + tab.dataset.tab).classList.add("active");
+      try { history.replaceState(null, "", "#" + tab.dataset.tab); } catch (_) {}
+    });
+  });
+  window.addEventListener("hashchange", () => {
+    const name = location.hash.replace(/^#/, "");
+    if (name && document.querySelector(`.tab[data-tab="${name}"]`)) switchTab(name);
+  });
+  const initial = location.hash.replace(/^#/, "");
+  if (initial && document.querySelector(`.tab[data-tab="${initial}"]`)) switchTab(initial);
+}
+
+function switchTab(name) {
+  const tab = document.querySelector(`.tab[data-tab="${name}"]`);
+  if (tab) tab.click();
+}
+
+// ---------- 批量下载 ----------
+function bindBatch() {
+  $("#batchBtn").addEventListener("click", async () => {
+    const links = $("#batchInput").value.split("\n").map((s) => s.trim()).filter((s) => s);
+    if (!links.length) { $("#batchStatus").textContent = "请输入链接"; return; }
+    $("#batchBtn").disabled = true;
+    $("#batchStatus").textContent = "启动中…";
+    try {
+      const r = await api("/api/download", "POST", { links });
+      if (!r.ok) throw new Error(r.error || "启动失败");
+      $("#batchStatus").textContent = `已启动后台下载（${links.length} 个 mod），进度见「下载进度」标签`;
+      $("#batchStatus").className = "status ok";
+      switchTab("progress");
+    } catch (e) {
+      $("#batchStatus").textContent = "启动失败：" + e.message;
+      $("#batchStatus").className = "status err";
+    } finally {
+      $("#batchBtn").disabled = false;
+    }
+  });
+  $("#clearBtn").addEventListener("click", () => {
+    $("#batchInput").value = "";
+    $("#batchStatus").textContent = "";
+  });
+}
+
+// ---------- 搜索 ----------
+function loadGameSelects() {
+  api("/api/games").then((r) => {
+    if (!(r && r.ok && r.games)) return;
+    const opts = '<option value="">— 请选择游戏 —</option>' +
+      Object.entries(r.games).map(([name, entry]) =>
+        `<option value="${esc(name)}">${esc(entry && entry.cn ? entry.cn + "（" + name + "）" : name)}</option>`).join("");
+    $("#searchGameSelect").innerHTML = opts;
+    const mm = $("#mmGameSelect");
+    if (mm) mm.innerHTML = opts;
+    const mmAdd = $("#mmAddGame");
+    if (mmAdd) mmAdd.innerHTML = opts;
+  }).catch(() => {});
+}
+
+function bindSearch() {
+  const now = new Date();
+  const d30 = new Date(now.getTime() - 30 * 86400000);
+  $("#searchEnd").value = now.toISOString().slice(0, 10);
+  $("#searchStart").value = d30.toISOString().slice(0, 10);
+
+  $("#earliestBtn").addEventListener("click", () => {
+    $("#searchStart").value = "2000-01-01";
+    $("#searchStatus").textContent = "开始日期已设为最早（2000-01-01）";
+  });
+
+  $("#searchBtn").addEventListener("click", async () => {
+    const startDate = $("#searchStart").value;
+    const endDate = $("#searchEnd").value;
+    if (!startDate || !endDate) { $("#searchStatus").textContent = "请选择日期范围"; return; }
+    const game = $("#searchGameSelect").value;
+    if (!game) { $("#searchStatus").textContent = "请选择要筛选的游戏"; return; }
+    const contentFilter = [];
+    if ($("#filterNormal").checked) contentFilter.push("normal");
+    if ($("#filterNsfw").checked) contentFilter.push("nsfw");
+    if (!contentFilter.length) { $("#searchStatus").textContent = "请至少选择一个内容分级"; return; }
+    $("#searchBtn").disabled = true;
+    $("#searchStatus").textContent = "启动搜索…";
+    try {
+      const r = await api("/api/search", "POST", { startDate, endDate, contentFilter, games: [game] });
+      if (!r.ok) throw new Error(r.error || "启动失败");
+      $("#searchStatus").textContent = "搜索中…（后台运行，可切换标签）";
+      $("#stopSearchBtn").style.display = "inline-block";
+      startSearchPoll();
+    } catch (e) {
+      $("#searchStatus").textContent = "搜索失败：" + e.message;
+      $("#searchStatus").className = "status err";
+      $("#searchBtn").disabled = false;
+    }
+  });
+
+  $("#stopSearchBtn").addEventListener("click", async () => {
+    await api("/api/search/stop", "POST", {});
+    $("#stopSearchBtn").style.display = "none";
+    $("#searchBtn").disabled = false;
+    $("#searchStatus").textContent = "已停止搜索（保留已找到的结果）";
+  });
+
+  $("#clearSearchBtn").addEventListener("click", async () => {
+    searchResults = [];
+    renderSearchResults();
+    await api("/api/search/clear", "POST", {});
+    $("#searchStatus").textContent = "列表已清空";
+  });
+
+  $("#selectAllBtn").addEventListener("click", () => {
+    document.querySelectorAll("#searchResultList input[type=checkbox]").forEach((cb) => (cb.checked = true));
+  });
+  $("#selectNoneBtn").addEventListener("click", () => {
+    document.querySelectorAll("#searchResultList input[type=checkbox]").forEach((cb) => (cb.checked = false));
+  });
+
+  $("#downloadSelectedBtn").addEventListener("click", async () => {
+    const selected = searchResults.filter((it) => {
+      const cb = document.getElementById("cb-" + it.modId);
+      return cb && cb.checked;
+    });
+    if (!selected.length) { $("#searchStatus").textContent = "请先勾选要下载的 mod"; return; }
+    $("#searchStatus").textContent = `正在启动 ${selected.length} 个 mod 的下载…`;
+    try {
+      const r = await api("/api/download-selected", "POST", { items: selected });
+      if (!r.ok) throw new Error(r.error || "启动失败");
+      $("#searchStatus").textContent = `已启动后台下载（${selected.length} 个 mod），进度见「下载进度」标签`;
+      $("#searchStatus").className = "status ok";
+      switchTab("progress");
+    } catch (e) {
+      $("#searchStatus").textContent = "启动失败：" + e.message;
+      $("#searchStatus").className = "status err";
+    }
+  });
+}
+
+async function keywordSearch() {
+  const q = ($("#kwInput").value || "").trim();
+  const game = $("#searchGameSelect").value;
+  const st = $("#kwStatus");
+  if (!q || !game) { if (st) { st.textContent = "请输入关键词并选择游戏"; st.className = "status err"; } return; }
+  if (st) { st.textContent = "搜索中…"; st.className = "status"; }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await api("/api/keyword-search?q=" + encodeURIComponent(q) + "&game=" + encodeURIComponent(game) + "&perpage=50&max=100");
+      if (!r || !r.ok) throw new Error((r && r.error) || "search failed");
+      searchResults = r.results || [];
+      renderSearchResults();
+      if (st) {
+        const norm = r.normalized ? `（${r.normalized.from} → ${r.normalized.to}）` : "";
+        st.textContent = `关键词「${q}」${norm}: ${searchResults.length} 个结果`;
+        st.className = "status ok";
+      }
+      return;
+    } catch (e) {
+      if (attempt < 2) { if (st) { st.textContent = "网络抖动，重试 " + (attempt + 1) + "/2…"; st.className = "status"; } await new Promise((r2) => setTimeout(r2, 1500)); }
+      else { if (st) { st.textContent = "搜索失败: " + e.message; st.className = "status err"; } }
+    }
+  }
+}
+
+function bindKeywordSearch() {
+  $("#kwSearchBtn").addEventListener("click", keywordSearch);
+  $("#kwInput").addEventListener("keydown", (e) => { if (e.key === "Enter") keywordSearch(); });
+}
+
+function startSearchPoll() {
+  if (searchPollTimer) clearInterval(searchPollTimer);
+  searchPollTimer = setInterval(async () => {
+    try {
+      const r = await api("/api/search-status");
+      const t = r.task;
+      if (!t) return;
+      if (t.status === "running") {
+        $("#searchStatus").textContent = t.message + "（后台运行中）";
+      } else {
+        clearInterval(searchPollTimer);
+        searchPollTimer = null;
+        $("#searchBtn").disabled = false;
+        $("#stopSearchBtn").style.display = "none";
+        $("#searchStatus").textContent = t.message;
+        $("#searchStatus").className = "status ok";
+      }
+      if (t.results) {
+        searchResults = t.results;
+        renderSearchResults();
+      }
+    } catch (_) {}
+  }, 2000);
+}
+
+function renderSearchResults() {
+  $("#resultCount").textContent = `共 ${searchResults.length} 个`;
+  if (!searchResults.length) {
+    $("#searchResultList").innerHTML = '<div class="empty">暂无结果</div>';
+    return;
+  }
+  $("#searchResultList").innerHTML = searchResults.map((it) => `
+    <div class="result-item">
+      <input type="checkbox" id="cb-${it.modId}">
+      <span class="badge ${it.isNsfw ? "nsfw" : "normal"}">${it.isNsfw ? "NSFW" : "普通"}</span>
+      <span class="name"><a href="${esc(it.profileUrl)}" target="_blank">${esc(it.name)}</a></span>
+      <span class="meta">${esc(it.game)} · ${esc(it.author)}</span>
+      <span class="meta">${fmtTs(it.dateAdded) !== "-" ? fmtTs(it.dateAdded) : fmtTs(it.dateUpdated)}</span>
+    </div>`).join("");
+}
+
+// ---------- 下载进度 ----------
+function bindProgress() {
+  $("#pauseBtn").addEventListener("click", () => api("/api/task/pause", "POST", {}));
+  $("#resumeBtn").addEventListener("click", () => api("/api/task/resume", "POST", {}));
+  $("#stopBtn").addEventListener("click", () => {
+    if (confirm("确定终止下载吗？已下载的文件会保留。")) api("/api/task/stop", "POST", {});
+  });
+  $("#retryBtn").addEventListener("click", async () => {
+    const r = await api("/api/task/retry-failed", "POST", {});
+    if (r && r.ok) { if (r.message) alert(r.message); try { const t = await api("/api/task"); renderTask(t.task); } catch (_) {} }
+    else alert((r && r.error) || "重试失败");
+  });
+  // 2026-08-26 用户要求加回：一键清除下载失败（失败项标记跳过，前端立即消失）
+  $("#clearFailBtn").addEventListener("click", async () => {
+    const r = await api("/api/skip-all-failed", "POST", {});
+    if (r && r.ok) { if (r.skipped > 0 && r.message) alert(r.message); try { const t = await api("/api/task"); renderTask(t.task); } catch (_) {} }
+    else alert((r && r.error) || "清除失败失败");
+  });
+  // 2026-08-26 用户要求加回：失败行 🔄重试 / 🚫跳过 按钮（事件委托）
+  document.addEventListener("click", async (ev) => {
+    const retryBtn = ev.target.closest(".mm-retry-btn");
+    if (retryBtn) {
+      ev.preventDefault();
+      const r = await api("/api/task/retry-failed", "POST", {});
+      if (r && r.ok) { if (r.message) alert(r.message); try { const t = await api("/api/task"); renderTask(t.task); } catch (_) {} }
+      else alert((r && r.error) || "重试失败");
+      return;
+    }
+    const skipBtn = ev.target.closest(".mm-skip-btn");
+    if (skipBtn) {
+      ev.preventDefault();
+      const r = await api("/api/skip", "POST", { url: skipBtn.dataset.url, path: skipBtn.dataset.path });
+      if (r && r.ok) { try { const t = await api("/api/task"); renderTask(t.task); } catch (_) {} }
+      else alert((r && r.error) || "跳过失败");
+      return;
+    }
+  });
+  $("#concurrencyBtn").addEventListener("click", async () => {
+    const v = parseInt($("#concurrencyInput").value, 10);
+    await api("/api/task/concurrency", "POST", { concurrency: v });
+  });
+  startTaskPoll();
+}
+
+function startTaskPoll() {
+  if (taskPollTimer) clearInterval(taskPollTimer);
+  taskPollTimer = setInterval(async () => {
+    try {
+      const r = await api("/api/task");
+      renderTask(r.task);
+    } catch (_) {}
+  }, 2000);
+}
+
+function fmtSpeed(s) {
+  if (!s || s <= 0) return "";
+  return s >= 1048576 ? (s / 1048576).toFixed(2) + " MB/s" : Math.round(s / 1024) + " KB/s";
+}
+
+function renderTask(task) {
+  const stateText = { running: "下载中", preparing: "准备中", done: "已完成", paused: "已暂停", stopped: "已终止", error: "出错" };
+  $("#taskState").textContent = task ? (stateText[task.status] || task.status) : "无任务";
+  if (!task) {
+    $("#progressFill").style.width = "0%";
+    $("#taskMeta").textContent = "尚未开始下载";
+    $("#activeList").innerHTML = "";
+    $("#taskList").innerHTML = '<div class="empty">暂无任务</div>';
+    $("#pauseBtn").disabled = true;
+    $("#resumeBtn").disabled = true;
+    $("#stopBtn").disabled = true;
+    $("#retryBtn").disabled = true;
+    return;
+  }
+
+  // 2026-08-26 修复：doneMap 必须在使用前声明（stuckOrFailed 先引用会 TDZ ReferenceError
+  //   → renderTask 每次抛错被轮询 catch 吞掉 → 前端不显示、后台正常——用户反馈的根因）
+  const doneMap = task.resultsMap || {};
+
+  // 2026-08-26 修复：失败项 + 卡住项（无结果且任务已结束）都可重试 → 全局重试按钮启用判定
+  const stuckOrFailed = (task.items || []).some((it, i) => {
+    if (!it || !it.path) return false;
+    const rr = doneMap[i];
+    return (rr && !rr.ok && !rr.skipped) || (!rr && task.status !== "running" && task.status !== "preparing");
+  });
+  $("#retryBtn").disabled = !stuckOrFailed;
+  const itemsLen = (task.items || []).length;
+  const rmKeys = Object.keys(task.resultsMap || {}).map(Number);
+  const rmMax = rmKeys.length ? Math.max(...rmKeys) + 1 : 0;
+  const total = Math.max(itemsLen, rmMax, task.doneCount || 0, (task.results || []).length);
+  const done = task.doneCount != null ? task.doneCount : (task.currentIndex || 0);
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  $("#progressFill").style.width = pct + "%";
+
+  const doneValues = Object.values(task.resultsMap || {});
+  const okCount = doneValues.filter((r) => r && r.ok && !r.skipped).length;
+  const skipCount = doneValues.filter((r) => r && r.skipped).length;
+  const failCount = doneValues.filter((r) => r && !r.ok).length;
+  let metaText = `${done}/${total} 项 | 成功 ${okCount} | 失败 ${failCount}`;
+  if (skipCount) metaText += ` | 跳过 ${skipCount}`;
+  $("#taskMeta").textContent = metaText + (task.message ? " ｜ " + task.message : "");
+
+  const activeEl = $("#activeList");
+  if (task.status === "running" || task.status === "preparing") {
+    const preparing = task.preparingItem;
+    const active = task.activeItems || [];
+    let html = "";
+    // 2026-08-26：准备阶段也展示（status=preparing 时同样显示准备进度 + 当前解析的 mod）
+    if (preparing && preparing.name) {
+      const prepCount = `${(task.buildIndex || 0) + 1}/${(task.pendingMods || []).length}`;
+      html += `<div class="item" style="padding:4px 8px;background:var(--card2)"><span class="icon">⏳</span><span>准备 ${prepCount}: ${esc(preparing.name)}</span></div>`;
+    } else if (task.status === "preparing" && (task.pendingMods || []).length) {
+      const prepCount = `${(task.buildIndex || 0)}/${(task.pendingMods || []).length}`;
+      html += `<div class="item" style="padding:4px 8px;background:var(--card2)"><span class="icon">⏳</span><span>准备中（${prepCount}）…</span></div>`;
+    }
+    if (active.length) {
+      html += `<div class="hint" style="margin:4px 0">⬇ 进行中（${active.length} 线程）:</div>`;
+      active.forEach((a) => {
+        const fromHtml = a.modName ? ` <span class="hint">· 来自 ${esc(a.modName)}</span>` : "";
+        const spd = a.speed ? ` <span class="status-text">⚡ ${fmtSpeed(a.speed)}</span>` : "";
+        html += `<div class="item" style="padding:4px 8px;background:rgba(59,130,246,.08)"><span class="icon">${typeIcon(a.type)}</span><span>${esc(a.name)}${fromHtml}</span>${spd}</div>`;
+      });
+    }
+    activeEl.innerHTML = html || "";
+  } else {
+    activeEl.innerHTML = "";
+  }
+
+  $("#pauseBtn").disabled = !(task.status === "running" || task.status === "preparing");
+  $("#resumeBtn").disabled = !(task.status === "paused");
+  $("#stopBtn").disabled = !(task.status === "running" || task.status === "preparing" || task.status === "paused");
+  if (task.concurrency && document.activeElement !== $("#concurrencyInput")) $("#concurrencyInput").value = task.concurrency;
+
+  if (task.status === "stopped") {
+    $("#taskList").innerHTML = '<div class="empty">已终止</div>';
+    return;
+  }
+
+  const groups = [];
+  const groupMap = new Map();
+  (task.items || []).forEach((item, idx) => {
+    const key = item.modUrl || item.modName || item.targetDir || "(未知)";
+    if (!groupMap.has(key)) {
+      const g = { key, targetDir: item.targetDir || "", items: [] };
+      groupMap.set(key, g);
+      groups.push(g);
+    }
+    groupMap.get(key).items.push({ item, idx });
+  });
+  const resultOf = (idx) => (doneMap[idx] != null ? doneMap[idx] : (idx < (task.results || []).length ? task.results[idx] : null));  // 正在下载项的实时进度（idx -> {received,total,speed}）——每行文件进度条用
+  const activeMap = {};
+  (task.activeItems || []).forEach((a) => {
+    if (a && a.idx != null) activeMap[a.idx] = { received: a.received || 0, total: a.total || 0, speed: a.speed || 0 };
+  });
+  // 2026-08-26 用户要求：每组 mod 一组出现在下载列表，整组下载完才从任务列表移除；
+  //   组内还有未处理(下载中/准备) → 整组显示全部行（各带状态）；
+  //   全部处理完但含失败 → 只留失败行（可 🔄重试 / 🚫跳过）；
+  //   全成功/全跳过 → 整组移除不再显示
+  const visibleGroups = groups.filter((g) => {
+    const hasPending = g.items.some(({ idx }) => resultOf(idx) == null);
+    if (hasPending) { g.keptRows = g.items; return true; }
+    const failed = g.items.filter(({ idx }) => {
+      const r = resultOf(idx);
+      return r && r.ok === false && !r.skipped;
+    });
+    if (failed.length) { g.keptRows = failed; return true; }
+    return false;
+  });
+  const html = visibleGroups.map((g, gi) => {
+    const rows = (g.keptRows || g.items).map(({ item, idx }) => {
+      let cls = "pending", icon = typeIcon(item.type), statusText = typeLabel(item.type);
+      const r = resultOf(idx);
+      if (r) {
+        if (r.skipped) { cls = "ok"; icon = "⏭"; statusText = r.exists ? "已存在（跳过）" : "已忽略"; }
+        else if (r.ok) { cls = "ok"; icon = "✓"; statusText = "成功"; }
+        else { cls = "fail"; icon = "✗"; statusText = r.error || "失败"; }
+      }
+      // 2026-08-26 用户要求加回：失败行 🔄重试 / 🚫跳过 按钮；
+      //   2026-08-26 修复：卡住行（无结果且任务非运行中）也显示按钮（重试/跳过后才能处理它）
+      let actBtns = "";
+      const canAct = r ? (r.ok === false && !r.skipped) : (task.status !== "running" && task.status !== "preparing");
+      if (canAct && item.path) {
+        actBtns = ` <button class="mm-retry-btn" data-url="${esc(item.url || "")}" data-path="${esc(item.path || "")}" title="重试下载此文件">🔄 重试</button>` +
+          ` <button class="mm-skip-btn" data-url="${esc(item.url || "")}" data-path="${esc(item.path || "")}" title="跳过此文件（下次请求可再下载）">🚫 跳过</button>`;
+      }
+      // 2026-08-26 用户要求：跳过的图片也显示预览图（已存在/已下载的图片项都显示缩略图）
+      const hasFile = r && (r.ok || (r.skipped && r.exists)) && item.path;
+      const isImgOk = item.type === "image" && !item.isGif && hasFile;
+      const thumb = isImgOk ? `<img class="row-thumb" src="/api/image?path=${encodeURIComponent(item.path)}" loading="lazy" alt="${esc(item.displayName || "")}">` : "";
+      // 每行文件进度条：成功100%绿 / 下载中实时蓝 / 失败100%红 / 未开始0%
+      let barPct = 0, barCls = "row-bar-pending";
+      if (r) {
+        if (r.ok) { barPct = 100; barCls = "row-bar-ok"; }
+        else { barPct = 100; barCls = "row-bar-fail"; }
+      } else if (activeMap[idx]) {
+        const ap = activeMap[idx];
+        barPct = ap.total > 0 ? Math.min(100, Math.round((ap.received / ap.total) * 100)) : 0;
+        barCls = "row-bar-active";
+        if (ap.speed) statusText += ` ⚡${fmtSpeed(ap.speed)}`;
+      }
+      const bar = `<span class="row-bar ${barCls}"><span class="row-bar-fill" style="width:${barPct}%"></span></span>`;
+      return `<div class="item ${cls}"><span class="icon">${icon}</span><span class="item-name">${esc(item.displayName || item.path || item.url || "")}${bar}</span><span class="status-text">${esc(statusText)}${actBtns}</span>${thumb}</div>`;
+    }).join("");
+    return `<div class="mod-group">
+      <div class="mod-group-head"><span class="group-num">${gi + 1}.</span><span>${esc(g.key)}</span><span class="mod-group-dir">📁 ${esc(g.targetDir)}</span></div>
+      ${rows}
+    </div>`;
+  }).join("");
+  $("#taskList").innerHTML = html || '<div class="empty">暂无任务</div>';
+}
+
+// ---------- 主题切换（2026-08-26 用户要求：蓝白=白天模式，香蕉风深色=夜间模式）----------
+function bindTheme() {
+  const btn = $("#themeBtn");
+  const apply = () => {
+    const night = document.documentElement.getAttribute("data-theme") === "night";
+    btn.textContent = night ? "☀️ 白天" : "🌙 夜间";
+    try { localStorage.setItem("gbmd-theme", night ? "night" : "day"); } catch (_) {}
+  };
+  btn.addEventListener("click", () => {
+    const night = document.documentElement.getAttribute("data-theme") === "night";
+    if (night) document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", "night");
+    apply();
+  });
+  apply();
+}
+
+// ---------- 设置 ----------
+function makeRootRow(name, entry) {
+  const div = document.createElement("div");
+  div.className = "grid-map-row";
+  const cn = (entry && entry.cn) || "";
+  const id = (entry && entry.id) || "";
+  const p = (entry && entry.downloadPath) || "";
+  div.innerHTML = `
+    <input class="root-game" value="${esc(name)}" readonly style="background:var(--card2);max-width:200px">
+    <input class="root-cn" value="${esc(cn)}" readonly style="background:var(--card2);max-width:90px">
+    <input class="root-id" value="${esc(id)}" readonly style="background:var(--card2);max-width:70px">
+    <input class="root-path" placeholder="下载路径根目录（如 /volume6/.../Mods/）" value="${esc(p)}" style="flex:1">
+    <button class="ghost browse-btn" type="button" title="读取本地选择目录">📂</button>`;
+  // 2026-08-26 用户要求：设置里设置下载地址增加「读取本地选择」——点 📂 弹目录选择器
+  div.querySelector(".browse-btn").addEventListener("click", () => openBrowse(div.querySelector(".root-path")));
+  return div;
+}
+
+// ---------- 目录选择弹窗（读取本地选择）----------
+let browseTargetInput = null;
+function openBrowse(input) {
+  browseTargetInput = input;
+  $("#browseMask").style.display = "flex";
+  $("#browseHint").textContent = "";
+  loadBrowse("/");
+}
+async function loadBrowse(p) {
+  const el = $("#browsePath");
+  el.textContent = "读取中…";
+  let r;
+  try { r = await api("/api/browse?path=" + encodeURIComponent(p)); }
+  catch (e) { el.textContent = "读取失败: " + e.message; return; }
+  if (!r || !r.ok) { el.textContent = (r && r.error) || "读取失败"; return; }
+  el.textContent = r.path;
+  $("#browseSelect").dataset.path = r.path;
+  let html = "";
+  if (r.parent) html += `<div class="browse-item" data-path="${esc(r.parent)}">⬆ 上级目录</div>`;
+  if (!r.dirs.length) html += '<div class="hint">（无子目录）</div>';
+  r.dirs.forEach((d) => {
+    const full = r.path === "/" ? "/" + d : r.path + "/" + d;
+    html += `<div class="browse-item" data-path="${esc(full)}">📁 ${esc(d)}</div>`;
+  });
+  $("#browseList").innerHTML = html;
+  $("#browseList").querySelectorAll(".browse-item").forEach((el2) => {
+    el2.addEventListener("click", () => loadBrowse(el2.dataset.path));
+  });
+}
+function bindBrowse() {
+  $("#browseClose").addEventListener("click", () => { $("#browseMask").style.display = "none"; });
+  $("#browseMask").addEventListener("click", (e) => { if (e.target === $("#browseMask")) $("#browseMask").style.display = "none"; });
+  $("#browseSelect").addEventListener("click", () => {
+    const p = $("#browseSelect").dataset.path || "";
+    if (browseTargetInput && p) { browseTargetInput.value = p; $("#browseMask").style.display = "none"; }
+  });
+}
+
+function renderGamesRows() {
+  const wrap = $("#rootMapRows");
+  wrap.innerHTML = "";
+  const games = (typeof window.__games === "object" && window.__games) || {};
+  for (const [name, entry] of Object.entries(games)) {
+    wrap.appendChild(makeRootRow(name, entry));
+  }
+}
+
+function bindSettings() {
+  // 保存下载路径
+  $("#saveGamesBtn").addEventListener("click", async () => {
+    const games = {};
+    document.querySelectorAll("#rootMapRows .grid-map-row").forEach((row) => {
+      const name = row.querySelector(".root-game").value.trim();
+      const cn = row.querySelector(".root-cn").value.trim();
+      const id = row.querySelector(".root-id").value.trim();
+      const p = row.querySelector(".root-path").value.trim();
+      if (!name) return;
+      games[name] = { cn, id: id ? Number(id) : 0, downloadPath: p };
+    });
+    try {
+      const r = await api("/api/games", "POST", { games });
+      if (!r.ok) throw new Error(r.error || "保存失败");
+      window.__games = r.games;
+      renderGamesRows();
+      $("#gamesStatus").textContent = "已保存到 json/gamebanana.com.json";
+      $("#gamesStatus").className = "status ok";
+    } catch (e) {
+      $("#gamesStatus").textContent = "保存失败：" + e.message;
+      $("#gamesStatus").className = "status err";
+    }
+  });
+
+  // 2026-08-26 用户要求：输入香蕉网 id 添加游戏，游戏名自动获取
+  $("#fetchGameBtn").addEventListener("click", async () => {
+    const id = parseInt($("#addGameId").value, 10);
+    const st = $("#addGameStatus");
+    if (!id || id <= 0) { st.textContent = "请输入香蕉网游戏 id"; st.className = "status err"; return; }
+    st.textContent = "获取中…"; st.className = "status";
+    try {
+      const r = await api("/api/gb-game-info?id=" + id);
+      if (!r.ok) throw new Error(r.error || "获取失败");
+      window.__addGameInfo = r.info;
+      $("#addGameName").textContent = `游戏名：${r.info.name}（香蕉网 id ${id}）`;
+      $("#addGamePreview").style.display = "flex";
+      st.textContent = "";
+    } catch (e) {
+      st.textContent = "获取失败: " + e.message;
+      st.className = "status err";
+    }
+  });
+  $("#addGameConfirmBtn").addEventListener("click", async () => {
+    const info = window.__addGameInfo;
+    const st = $("#addGameStatus");
+    if (!info) return;
+    const games = { ...(window.__games || {}) };
+    games[info.name] = { id: info.id, cn: info.name, downloadPath: "" };
+    try {
+      const r = await api("/api/games", "POST", { games });
+      if (!r.ok) throw new Error(r.error || "添加失败");
+      window.__games = r.games;
+      renderGamesRows();
+      st.textContent = `已添加「${info.name}」（下载路径请在下方填写后保存）`;
+      st.className = "status ok";
+      $("#addGamePreview").style.display = "none";
+      $("#addGameId").value = "";
+    } catch (e) {
+      st.textContent = "添加失败: " + e.message;
+      st.className = "status err";
+    }
+  });
+
+  $("#saveSettingsBtn").addEventListener("click", async () => {
+    // 2026-08-26 用户要求：设置里不要并发数（只在「下载进度」页改并发）——payload 只存 gbCookie
+    const payload = {
+      gbCookie: $("#gbCookie").value.trim()
+    };
+    try {
+      const r = await api("/api/settings", "POST", payload);
+      if (!r.ok) throw new Error(r.error || "保存失败");
+      settings = r.settings;
+      $("#settingsStatus").textContent = "已保存";
+      $("#settingsStatus").className = "status ok";
+    } catch (e) {
+      $("#settingsStatus").textContent = "保存失败：" + e.message;
+      $("#settingsStatus").className = "status err";
+    }
+  });
+
+  $("#gbLoginCheckBtn").addEventListener("click", checkGbLoginStatus);
+  checkGbLoginStatus();
+
+  $("#changePwdBtn").addEventListener("click", async () => {
+    const pwd = $("#newPwd").value;
+    if (pwd.length < 4) { $("#pwdStatus").textContent = "密码至少 4 位"; return; }
+    try {
+      const r = await api("/api/change-password", "POST", { password: pwd });
+      if (!r.ok) throw new Error(r.error || "修改失败");
+      $("#pwdStatus").textContent = "密码已修改";
+      $("#pwdStatus").className = "status ok";
+      $("#newPwd").value = "";
+    } catch (e) {
+      $("#pwdStatus").textContent = e.message;
+      $("#pwdStatus").className = "status err";
+    }
+  });
+
+  // ---- HTML 反查（2026-08-26：hash md5 或图片原始短名都支持）----
+  // 三表：本地表命中（source=local）→ 有实际落盘路径；GB 表命中（source=gb）→ 仅线上信息；
+  //       HTML 表命中（source=html）→ 按 GB 原名（图片短名/压缩包名）从 description.html 反查
+  async function hashQuery() {
+    const h = String($("#hashInput").value || "").trim();
+    const st = $("#hashStatus"), res = $("#hashResult");
+    if (!h) { st.textContent = "请输入 hash 或图片短名"; st.className = "status err"; return; }
+    st.className = "status";
+    st.textContent = "查询中…";
+    try {
+      const r = await api("/api/hash-query?hash=" + encodeURIComponent(h));
+      if (!r.ok) throw new Error(r.error || "查询失败");
+      if (!r.found) {
+        st.textContent = "未找到（试试：压缩包 GB 页面 MD5 / 图片原始短名如 69b46e18405cc.jpg，或先「重建索引」）";
+        st.className = "status err";
+        res.innerHTML = "";
+        return;
+      }
+      const isLocal = r.source === "local";
+      const srcLabel = isLocal ? "✅ 本地表命中" : (r.source === "html" ? "ℹ️ HTML 表命中（按 GB 原名反查）" : "ℹ️ GB 表命中（此 mod 未在本机下载）");
+      st.textContent = srcLabel + "（" + (r.file.kind === "image" ? "图片" : "文件") + "）";
+      st.className = isLocal ? "status ok" : "status";
+      const rel = (r.modDir || "").split("/").slice(-4).join("/");
+      res.innerHTML =
+        '<div class="mm-mis">📦 <b>' + esc(r.mod.name) + '</b> by ' + esc(r.mod.author) +
+        (r.mod.game ? "（" + esc(r.mod.game) + "）" : "") +
+        (r.mod.modId ? " [mods/" + esc(r.mod.modId) + "]" : "") + "</div>" +
+        '<div class="hint">🔗 <a href="' + esc(r.mod.url || "") + '" target="_blank">' + esc(r.mod.url || "") + "</a></div>" +
+        (isLocal ? '<div class="hint">📁 本地目录：<code>' + esc(rel) + "</code></div>" : "") +
+        '<div class="hint">文件：<code>' + esc(r.file.name || "") + "</code>" +
+        (r.file.gbMd5 ? "（MD5: <code>" + esc(r.file.gbMd5) + "</code>）" : "") + "</div>" +
+        (!isLocal && r.mod.url
+          ? '<div class="row mt"><button id="hashDlBtn" type="button" class="primary">⬇ 下载此 mod</button><span class="hint" id="hashDlStatus"></span></div>'
+          : "");
+      // GB 表命中 → 提供「下载此 mod」
+      const dlBtn = $("#hashDlBtn");
+      if (dlBtn) {
+        dlBtn.addEventListener("click", async () => {
+          const ds = $("#hashDlStatus");
+          if (ds) { ds.textContent = "已提交下载…"; ds.className = "status"; }
+          try {
+            const rr = await api("/api/download", "POST", { links: [r.mod.url] });
+            if (!rr.ok) throw new Error(rr.error || "提交失败");
+            if (ds) { ds.textContent = "✅ 已加入下载（见「下载进度」页）"; ds.className = "status ok"; }
+            dlBtn.disabled = true;
+          } catch (e) {
+            if (ds) { ds.textContent = "失败: " + e.message; ds.className = "status err"; }
+          }
+        });
+      }
+    } catch (e) {
+      st.textContent = "查询失败: " + e.message;
+      st.className = "status err";
+    }
+  }
+  const hq = $("#hashQueryBtn");
+  if (hq) hq.addEventListener("click", hashQuery);
+  const hi = $("#hashInput");
+  if (hi) hi.addEventListener("keydown", (e) => { if (e.key === "Enter") hashQuery(); });
+  const hr = $("#hashRebuildBtn");
+  if (hr) hr.addEventListener("click", async () => {
+    const st = $("#hashStatus");
+    st.className = "status";
+    st.textContent = "后台重建两张表（GB 信息表 + 本地表）…（可继续查询旧索引）";
+    try {
+      const r = await api("/api/hash-rebuild", "POST", {});
+      if (!r.ok) throw new Error(r.error || "启动失败");
+      // 轮询直到完成
+      const poll = async () => {
+        const s = await api("/api/hash-index-status");
+        if (s && s.running) { setTimeout(poll, 1500); return; }
+        st.textContent = "✅ 索引已重建：GB 表 " + (s ? s.gb : "?") + " 条，本地表 " + (s ? s.local : "?") + " 条（" + (s ? s.htmls : "?") + " 个 HTML）";
+        st.className = "status ok";
+      };
+      setTimeout(poll, 1200);
+    } catch (e) {
+      st.textContent = "重建失败: " + e.message;
+      st.className = "status err";
+    }
+  });
+  // 展示双表状态
+  api("/api/hash-index-status").then((s) => {
+    if (s && s.ok) {
+      const st = $("#hashStatus");
+      if (st) {
+        st.textContent = "索引：GB 表 " + (s.gb || 0) + " 条 / 本地表 " + (s.local || 0) + " 条" + (s.running ? "，重建中…" : "");
+        st.className = "status";
+      }
+    }
+  }).catch(() => {});
+
+  // ---- GB 表模糊搜索（2026-08-26 用户要求：离线 mod 目录，按 mod 名/作者查）----
+  async function hashSearch() {
+    const q = String($("#hashSearchInput").value || "").trim();
+    const st = $("#hashSearchStatus"), res = $("#hashSearchResult");
+    if (q.length < 2) { st.textContent = "关键词至少 2 个字符"; st.className = "status err"; return; }
+    st.className = "status";
+    st.textContent = "搜索中…";
+    try {
+      const r = await api("/api/hash-index-search?q=" + encodeURIComponent(q));
+      if (!r.ok) throw new Error(r.error || "搜索失败");
+      if (!r.count) {
+        st.textContent = "GB 表中无匹配（试试其他关键词，或先「重建索引」覆盖全部已下载 mod）";
+        st.className = "status";
+        res.innerHTML = "";
+        return;
+      }
+      st.textContent = "✅ 命中 " + r.count + " 个 mod（GB 表）";
+      st.className = "status ok";
+      res.innerHTML = r.results.map((m) =>
+        '<div class="mm-mis">📦 <b>' + esc(m.modName) + '</b> by ' + esc(m.author) +
+        (m.game ? "（" + esc(m.game) + "）" : "") +
+        (m.hasLocal ? ' <span class="badge" style="background:#2e7d32">已下载</span>' : ' <span class="badge" style="background:#888">未下载</span>') +
+        ' <span class="hint">' + m.fileCount + " 个文件</span></div>" +
+        '<div class="row" style="margin:2px 0 8px 0"><a class="hint" href="' + esc(m.url || "") + '" target="_blank">' + esc(m.url || "") + "</a>" +
+        (!m.hasLocal && m.url
+          ? '<button class="ghost" data-dl="' + esc(m.url) + '" style="margin-left:8px">⬇ 下载</button>'
+          : "") + "</div>"
+      ).join("");
+      // 下载按钮委托
+      res.querySelectorAll("button[data-dl]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          btn.textContent = "提交中…";
+          try {
+            const rr = await api("/api/download", "POST", { links: [btn.dataset.dl] });
+            if (!rr.ok) throw new Error(rr.error || "提交失败");
+            btn.textContent = "✅ 已加入下载";
+          } catch (e) { btn.textContent = "失败: " + e.message; btn.disabled = false; }
+        });
+      });
+    } catch (e) {
+      st.textContent = "搜索失败: " + e.message;
+      st.className = "status err";
+    }
+  }
+  const hss = $("#hashSearchBtn");
+  if (hss) hss.addEventListener("click", hashSearch);
+  const hsi = $("#hashSearchInput");
+  if (hsi) hsi.addEventListener("keydown", (e) => { if (e.key === "Enter") hashSearch(); });
+}
+
+async function checkGbLoginStatus() {
+  const el = $("#gbLoginStatus");
+  const btn = $("#gbLoginCheckBtn");
+  if (!el) return;
+  el.className = "status";
+  el.textContent = "检测中…";
+  if (btn) btn.disabled = true;
+  try {
+    const r = await api("/api/gb-login-status");
+    if (r && r.ok && r.loggedIn) {
+      el.textContent = `✅ ${r.detail || "已登录"}`;
+      el.className = "status ok";
+    } else if (r && r.ok && r.configured) {
+      el.textContent = `⚠️ ${r.detail || "未登录"}`;
+      el.className = "status err";
+    } else {
+      el.textContent = "○ 未配置 gbCookie（浏览器登录 gamebanana.com 后复制完整 cookie）";
+      el.className = "status";
+    }
+  } catch (e) {
+    el.textContent = "检测失败: " + (e.message || String(e));
+    el.className = "status err";
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function loadSettings() {
+  try {
+    const r = await api("/api/settings");
+    settings = r.settings;
+    // 2026-08-26 用户要求：设置里不要并发数（只在「下载进度」页改）——不再回填 dlConcurrency
+    $("#gbCookie").value = settings.gbCookie || "";
+  } catch (_) {}
+  try {
+    const g = await api("/api/games");
+    if (g.ok && g.games) {
+      window.__games = g.games;
+      renderGamesRows();
+    }
+  } catch (_) {}
+}
+
+// ---------- 文件夹合并 ----------
+let mergePlan = [];
+async function mergeRolesPreview() {
+  const game = $("#mmGameSelect").value;
+  const st = $("#mmMergeStatus");
+  if (!game) { st.textContent = "请先选择游戏"; st.className = "status err"; return; }
+  st.textContent = "扫描角色目录…";
+  st.className = "status";
+  const d = await api("/api/merge-roles", "POST", { dryRun: true, game });
+  const el = $("#mmMergePlan");
+  if (!d || !d.ok) { st.textContent = "失败: " + ((d && d.error) || "未知"); st.className = "status err"; return; }
+  mergePlan = d.merged || [];
+  st.textContent = `发现 ${d.groups} 组可合并角色目录（${mergePlan.length} 个纯英文目录将重命名为「英文 – 中文」）`;
+  st.className = "status ok";
+  el.innerHTML = mergePlan.length
+    ? mergePlan.map((m) => `<div class="mm-mis">🔀 ${esc(m.from.split("/Mods/")[1] || m.from)} → <b>${esc(m.to.split("/Mods/")[1] || m.to)}</b></div>`).join("")
+    : '<div class="hint">无需要合并的角色目录</div>';
+}
+async function mergeRolesRun() {
+  if (!mergePlan.length) { alert("请先「预览合并计划」"); return; }
+  if (!confirm(`执行合并：${mergePlan.length} 个纯英文目录重命名为「英文 – 中文」（同角色已有规范目录则并入，空目录进 .trash）？`)) return;
+  const game = $("#mmGameSelect").value;
+  const st = $("#mmMergeStatus");
+  st.textContent = "合并中…";
+  st.className = "status";
+  const d = await api("/api/merge-roles", "POST", { dryRun: false, game });
+  if (!d || !d.ok) { st.textContent = "失败: " + ((d && d.error) || "未知"); st.className = "status err"; return; }
+  st.textContent = `合并完成：${(d.merged || []).length} 个目录，${(d.skipped || []).length} 跳过，${(d.trashed || []).length} 进回收站`;
+  st.className = "status ok";
+  $("#mmMergePlan").innerHTML = "";
+  mergePlan = [];
+}
+
+function bindMerge() {
+  $("#mmMergeBtn").addEventListener("click", mergeRolesPreview);
+  $("#mmMergeGoBtn").addEventListener("click", mergeRolesRun);
+
+  // ---- 2026-08-26 用户要求：手动添加映射（选游戏/仓库 → 从香蕉网获取角色列表 → 写入 mapping JSON）----
+  // 级联（2026-08-26 用户要求）：先选游戏 → 才能选仓库；先选仓库 → 才能选角色（英文名）
+  $("#mmAddGame").addEventListener("change", async () => {
+    const game = $("#mmAddGame").value;
+    const wh = $("#mmAddWarehouse");
+    const en = $("#mmAddEn"), zh = $("#mmAddZh");
+    // 未选游戏：仓库/角色禁用
+    if (!game) {
+      wh.disabled = true; en.disabled = true; zh.disabled = true;
+      wh.innerHTML = '<option value="">— 请先选择游戏 —</option>';
+      en.value = ""; zh.value = "";
+      return;
+    }
+    wh.disabled = false;
+    en.disabled = true; zh.disabled = true; en.value = ""; zh.value = "";
+    wh.innerHTML = '<option value="">— 加载中 —</option>';
+    try {
+      const r = await api("/api/gb-warehouses?game=" + encodeURIComponent(game));
+      if (!r.ok) throw new Error(r.error || "获取失败");
+      wh.innerHTML = '<option value="">— 请选择仓库 —</option>' +
+        (r.warehouses || []).map((w) =>
+          `<option value="${esc(w.name)}">${esc(w.name)}${w.type === "characters" && w.from ? "（来自" + esc(w.from) + "）" : ""}${w.local && w.type !== "characters" ? "（" + esc(w.local) + "）" : ""}</option>`).join("");
+      // 2026-08-26：选完游戏即预加载角色列表（英文名下拉数据先就绪，选了仓库立即可用）
+      loadGbCharacters();
+    } catch (e) {
+      wh.innerHTML = '<option value="">— 获取失败 —</option>';
+    }
+  });
+  $("#mmAddWarehouse").addEventListener("change", () => {
+    const en = $("#mmAddEn"), zh = $("#mmAddZh");
+    if (!$("#mmAddWarehouse").value) { en.disabled = true; zh.disabled = true; en.value = ""; return; }
+    en.disabled = false; zh.disabled = false; // 选了仓库才能选角色/填中文
+    loadGbCharacters();
+  });
+  // 选仓库（角色等）→ 从香蕉网获取角色列表填入英文名下拉
+  async function loadGbCharacters() {
+    const game = $("#mmAddGame").value;
+    const st = $("#mmAddStatus");
+    if (!game) return;
+    if (st) { st.textContent = "从香蕉网获取角色列表…"; st.className = "status"; }
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await api("/api/gb-characters?game=" + encodeURIComponent(game));
+        if (!r.ok) throw new Error(r.error || "获取失败");
+        window.__gbChars = r.characters || [];
+        if (st) { st.textContent = `已从香蕉网获取 ${window.__gbChars.length} 个角色（英文名输入时过滤选择，如 Od → Odette）`; st.className = "status ok"; }
+        return;
+      } catch (e) {
+        if (attempt === 0) { if (st) { st.textContent = "网络抖动，重试…"; st.className = "status"; } await new Promise((r2) => setTimeout(r2, 1200)); }
+        else if (st) { st.textContent = "获取失败: " + e.message; st.className = "status err"; }
+      }
+    }
+  }
+  // 可搜索角色下拉（自绘，最多显示 20 条，输入过滤）
+  function renderCombo(filter) {
+    const list = window.__gbChars || [];
+    const el = $("#mmComboList");
+    const q = String(filter || "").trim().toLowerCase();
+    const matched = q
+      ? list.filter((c) => c.toLowerCase().includes(q))
+      : list;
+    const shown = matched.slice(0, 20);
+    if (!shown.length) { el.innerHTML = '<div class="combo-empty">无匹配角色</div>'; el.style.display = "block"; return; }
+    el.innerHTML = shown.map((c) => `<div class="combo-item" data-v="${esc(c)}">${esc(c)}</div>`).join("");
+    el.style.display = "block";
+  }
+  $("#mmAddEn").addEventListener("focus", () => { if (!$("#mmAddEn").disabled) renderCombo($("#mmAddEn").value); });
+  $("#mmAddEn").addEventListener("input", () => renderCombo($("#mmAddEn").value));
+  $("#mmAddEn").addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") {
+      const items = document.querySelectorAll("#mmComboList .combo-item");
+      if (items.length) { e.preventDefault(); const cur = document.querySelector("#mmComboList .combo-item.hover") || items[0]; cur.classList.remove("hover"); (cur.nextElementSibling || items[0]).classList.add("hover"); }
+    } else if (e.key === "ArrowUp") {
+      const items = document.querySelectorAll("#mmComboList .combo-item");
+      if (items.length) { e.preventDefault(); const cur = document.querySelector("#mmComboList .combo-item.hover") || items[0]; cur.classList.remove("hover"); (cur.previousElementSibling || items[items.length - 1]).classList.add("hover"); }
+    } else if (e.key === "Enter") {
+      const cur = document.querySelector("#mmComboList .combo-item.hover");
+      if (cur) { e.preventDefault(); $("#mmAddEn").value = cur.dataset.v; $("#mmComboList").style.display = "none"; }
+    } else if (e.key === "Escape") {
+      $("#mmComboList").style.display = "none";
+    }
+  });
+  document.addEventListener("click", (e) => {
+    const item = e.target.closest && e.target.closest(".combo-item");
+    if (item) { $("#mmAddEn").value = item.dataset.v; $("#mmComboList").style.display = "none"; return; }
+    if (!e.target.closest || !e.target.closest("#mmAddEn")) $("#mmComboList").style.display = "none";
+  });
+  $("#mmAddWarehouse").addEventListener("change", loadGbCharacters);
+  $("#mmAddGame").addEventListener("change", () => { window.__gbChars = []; $("#mmComboList").style.display = "none"; });
+
+  // 添加映射
+  $("#mmAddBtn").addEventListener("click", async () => {
+    const game = $("#mmAddGame").value;
+    const en = $("#mmAddEn").value.trim();
+    const zh = $("#mmAddZh").value.trim();
+    const st = $("#mmAddStatus");
+    if (!game || !en || !zh) { if (st) { st.textContent = "请选择游戏并填写英文名/中文名"; st.className = "status err"; } return; }
+    try {
+      const r = await api("/api/mapping/add-role", "POST", { game, en, zh });
+      if (!r.ok) throw new Error(r.error || "添加失败");
+      if (st) { st.textContent = `已添加：${en} → ${zh}（已写入 mapping/${game}.json）`; st.className = "status ok"; }
+      $("#mmAddEn").value = "";
+      $("#mmAddZh").value = "";
+    } catch (e) {
+      if (st) { st.textContent = "添加失败: " + e.message; st.className = "status err"; }
+    }
+  });
+}
+
+// ---------- 退出 ----------
+function bindLogout() {
+  $("#logoutBtn").addEventListener("click", async () => {
+    await api("/api/logout", "POST", {});
+    location.href = "/login.html";
+  });
+}
+
+// ---------- 启动 ----------
+async function init() {
+  try {
+    const st = await api("/api/status");
+    // 2026-08-26 用户要求：未设置密码 → 不强制跳 setup，直接可用（页面顶部警告）
+    if (st.needsSetup) {
+      const w = $("#noPwdWarn");
+      if (w) w.style.display = "block";
+      // 未设密码时隐藏退出按钮（没有登录态概念）
+      const lb = $("#logoutBtn");
+      if (lb) lb.style.display = "none";
+    } else if (st.needsAuth) {
+      // 已设密码但未登录 → 登录页
+      const s = await api("/api/settings");
+      if (!s.ok) { location.href = "/login.html"; return; }
+    }
+  } catch (_) {}
+  bindTabs();
+  bindBatch();
+  bindSearch();
+  bindKeywordSearch();
+  bindProgress();
+  bindSettings();
+  bindBrowse();
+  bindMerge();
+  bindTheme();
+  bindLogout();
+  loadGameSelects();
+  await loadSettings();
+  try {
+    const c = await api("/api/search/cache");
+    if (c.cache && c.cache.results && c.cache.results.length) {
+      searchResults = c.cache.results;
+      renderSearchResults();
+    }
+    const st = await api("/api/search-status");
+    if (st.task && st.task.status === "running") {
+      $("#searchBtn").disabled = true;
+      $("#stopSearchBtn").style.display = "inline-block";
+      startSearchPoll();
+    }
+  } catch (_) {}
+  setInterval(() => {
+    $("#serverTime").textContent = new Date().toLocaleString("zh-CN", { hour12: false });
+  }, 1000);
+}
+
+init();

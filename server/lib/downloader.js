@@ -947,7 +947,7 @@ async function doDownloadLoop() {
         //   并发数原来在任务开始时定死（消费者数量固定），中途改 task.concurrency 无效。
         //   现在每个消费者取项前先按「当前并发数」限流——活跃下载数 ≥ 当前并发则等待，
         //   应用后立即按新并发生效（调大→马上多开；调小→不再开新的，正在下的完成）
-        const cur = Math.max(1, Math.min(16, parseInt(task.concurrency, 10) || 4));
+        const cur = Math.max(1, Math.min(32, parseInt(task.concurrency, 10) || 4));
         if ((task.activeItems || []).length >= cur) {
           await new Promise((r) => setTimeout(r, 300));
           continue;
@@ -1208,7 +1208,8 @@ function stopTask() {
 function setConcurrency(n) {
   let v = parseInt(n, 10);
   if (isNaN(v) || v < 1) v = 1;
-  if (v > 16) v = 16;
+  // 2026-08-26 用户要求：并发上限 16 → 32（大任务批量下载时可开到 32）
+  if (v > 32) v = 32;
   if (task) {
     task.concurrency = v;
     task.updatedAt = Date.now();

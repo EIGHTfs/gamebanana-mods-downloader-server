@@ -215,14 +215,32 @@ async function genIndexHtml(url) {
     dateAdded: mod.dateAdded,
     dateModified: mod.dateModified,
     text: mod.text || "",
-    files: (mod.files || []).map((f) => ({
-      file: mapping.sanitizeName(f.file),
-      url: f.url || "",
-      size: f.size || 0,
-      gbMd5: String(f.md5 || "").toLowerCase(),
-      description: f.description || "",
-      hash: ""
-    })),
+    // 2026-08-26 用户要求：HTML 追加合并——本地旧 HTML 的文件记录保留（含作者删掉/历史遗留的），
+    //   网上获取的新文件记录追加/更新（不直接覆盖）。这样作者删掉的文件仍有记录可寻回。
+    files: (() => {
+      const merged = [];
+      const seen = new Set();
+      // ① 旧 HTML 记录（本地历史遗留，含网上已下架的）——保留
+      for (const oldF of (existing && existing.files) || []) {
+        if (!oldF || !oldF.file) continue;
+        const key = String(oldF.file).toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        merged.push({ file: oldF.file, url: oldF.url || "", size: oldF.size || 0, gbMd5: oldF.gbMd5 || "", description: oldF.description || "", hash: oldF.hash || "", legacy: true });
+      }
+      // ② 网上新文件记录——追加（同名则更新为最新）
+      for (const f of mod.files || []) {
+        const name = mapping.sanitizeName(f.file);
+        const key = String(name).toLowerCase();
+        const idx = merged.findIndex((x) => String(x.file).toLowerCase() === key);
+        if (idx >= 0) {
+          merged[idx] = { file: name, url: f.url || "", size: f.size || 0, gbMd5: String(f.md5 || "").toLowerCase(), description: f.description || "", hash: merged[idx].hash || "" };
+        } else {
+          merged.push({ file: name, url: f.url || "", size: f.size || 0, gbMd5: String(f.md5 || "").toLowerCase(), description: f.description || "", hash: "" });
+        }
+      }
+      return merged;
+    })(),
     images: (mod.images || []).map((img) => {
       const name = mapping.sanitizeName((img && img.file) || (img.url ? path.basename(String(img.url).split("?")[0]) : ""));
       // 2026-08-26 优化：合并旧 HTML 已记录的图片内容 hash（重下时据此判断「内容已在库」跳过/垃圾桶找回）

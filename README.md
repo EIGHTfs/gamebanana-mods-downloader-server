@@ -57,7 +57,7 @@ node server/app.js
 | 下载 | 批量输入 mod 链接或纯数字 id，一键开始；下方是搜索区 |
 | 下载进度 | 每个文件的实时状态（下载中/成功/跳过/失败）、进度条、预览图；失败可单独重试/跳过；并发数调节 |
 | 搜索 | 关键词搜索（中文归一）＋ 按时间搜索；结果勾选后一键下载 |
-| 设置 | 游戏下载路径（可读取本地目录）、GB Cookie 与登录检测、映射管理、文件夹合并、hash 反查、修改密码 |
+| 设置 | 游戏下载路径（可读取本地目录）、GB Cookie 与登录检测、映射管理、文件夹合并、HTML 反查、修改密码 |
 
 > 📸 界面截图见文末「界面截图」章节（占位）。
 
@@ -76,7 +76,7 @@ node server/app.js
 │       ├── downloader.js      # 四步下载流程 + 并发/断点续传/重试/跳过
 │       ├── search.js          # 按时间搜索（三时间字段 OR）
 │       ├── merge-dirs.js      # 文件夹合并（英文目录 → 英文 – 中文）
-│       └── hash-index.js      # hash 反查双表（GB 线上表 + 本地表）
+│       └── hash-index.js      # HTML 反查三表（GB 线上表 + 本地表 + HTML 原名表）
 ├── json/
 │   ├── gamebanana.com.json.example  # 游戏配置示例（复制为 gamebanana.com.json 后填真实下载路径）
 │   └── gb-hash-index.json     # GB 线上信息表（hash → mod 信息，随仓库共享）
@@ -138,7 +138,7 @@ node server/app.js
 
 | 游戏 | 角色数 | 搜索变体数 |
 |---|---|---|
-| Genshin Impact（原神） | 128 | 734 |
+| Genshin Impact（原神） | 137 | 736 |
 | Honkai Impact 3rd（崩坏3） | 162 | 155 |
 | Honkai Star Rail（星穹铁道） | 96 | 120 |
 | Wuthering Waves（鸣潮） | 61 | 69 |
@@ -159,9 +159,12 @@ node server/app.js
 
 **③ 整理阶段**：
 - `.gbmd.part` 处理：主文件 + part 都存在 → 删 part；仅 part → 保留（断点续传）
-- 文件夹内图片全部重命名为**内容 MD5**；重复图片移入 `.trash`
+- 文件名一律按 **GB 原名**保存（压缩包/图片/gif 都不重命名；图片就是 GB 短名 `_sFile`，不是内容 MD5）
 
 **④ 正式下载**：按 HTML 文件列表并发下载缺失文件（Range 断点续传、失败重试 3 次、停滞检测）；不改原始文件名，非法字符用空格替换。
+- **归档文件**：GB 的旧归档版本（`_aArchivedFiles`，如 `xxx_sfw_7e4c1.rar`）一并下载
+- **gif 不强求**：下载失败自动跳过（不重试、不显示失败）；下载成功才以 GB 原名加入 HTML
+- **垃圾桶找回**：下载时若 `.trash` 里有同名文件（含 `dup-归位-` 前缀目录），自动找回而非重新下载
 
 > 已存在的文件自动跳过（`_skip`）；下载完的 mod 再次下载 → 全部跳过，只补缺失项。
 
@@ -170,24 +173,23 @@ node server/app.js
 ## HTML 反查（三索引）
 
 网页「设置 → HTML 反查」：输入文件 MD5 **或图片原始短名**（GB 原名，如 `69b46e18405cc.jpg`），反查它属于哪个 mod。
-三索引：**GB 信息表**（hash → 线上 mod 信息，随仓库共享）+ **本地表**（hash → 实际下载位置，下载时自动追加）+ **HTML 原名表**（GB 原名短名 → mod，扫描全部 description.html）。
-下载的旧归档版本（GB `_aArchivedFiles`）也会一并纳入，垃圾桶里的旧版文件反查命中率 90%+。
+**三索引设计**：
 
-**双表设计**：
-
-| 表 | 文件 | 内容 | git |
+| 索引 | 文件 | 内容 | git |
 |---|---|---|---|
 | GB 线上信息表 | `json/gb-hash-index.json` | hash → mod 名/作者/游戏/链接/GB 文件名 | ✅ 随仓库共享 |
 | 本地信息表 | `json/local-hash-index.json` | hash → 本机实际下载目录/文件名 | ⛔ git 忽略 |
+| HTML 原名表 | `json/html-name-index.json` | GB 原名（图片短名/压缩包名）→ mod | ⛔ git 忽略 |
 
 **查询行为**：
-- **双表命中**（本机下载过）→ 显示 mod 信息 + **本机实际目录**
+- **本地表命中**（本机下载过）→ 显示 mod 信息 + **本机实际目录**
 - **仅 GB 表命中**（线上有、本机没下）→ 显示线上信息 + **「下载此 mod」按钮**
+- **HTML 原名表命中**（输入图片短名如 `69b46e18405cc.jpg`）→ 从全部 description.html 反查所属 mod
 - **离线目录搜索**：按 mod 名/作者模糊搜 GB 表（无需连香蕉网），未下载的可一键下载
 
 **索引维护**：
-- 启动时自动加载两张表
-- 每次新下载写完 HTML → **自动增量并入**（新 hash 立即可查，毫秒级）
+- 启动时自动加载三张表
+- 每次新下载写完 HTML → **自动增量并入**（新 hash/原名立即可查，毫秒级）
 - 全量重建：设置页「重建索引」按钮（从全部 description.html 提取，约 6000 个 HTML 热缓存 1 秒）
 
 ---
@@ -213,11 +215,11 @@ npm run dist:linux   # Linux (AppImage/deb)
 ## 测试记录（实测）
 
 ### 下载与整理
-- ✅ 四步流程：下载 mod → 规范路径 `角色/Varesa – 瓦雷莎/[Aiui] Varesa Winter Bikini Mod/`（zip + md5 图 + HTML）
+- ✅ 四步流程：下载 mod → 规范路径 `角色/Varesa – 瓦雷莎/[Aiui] Varesa Winter Bikini Mod/`（zip + GB 原名图 + HTML）
 - ✅ 查重归位：旧裸文件夹 `Varesa Winter Bikini Mod` 自动归位到规范路径，已存在文件全部跳过（5 项 4 跳过 1 补下）
 - ✅ 旧目录移动：整批旧 mod 目录（含子目录）自动 `mv` 到规范路径，重复文件进 `.trash`（可恢复）
 - ✅ 断点续传：`.gbmd.part` + Range 恢复；416/200 无 Range 时自动删 part 重下
-- ✅ 失败重试/跳过：不可达图床（tumblr/tenor/patreon）标记跳过；失败项可单独重试
+- ✅ 失败重试/跳过：不可达图床（tumblr/tenor/patreon）标记跳过；失败项可单独重试；gif 失败自动跳过不重试
 - ✅ 并发即时生效：进度页改并发数立即生效（动态限流）
 
 ### 映射与搜索
@@ -230,10 +232,11 @@ npm run dist:linux   # Linux (AppImage/deb)
 - ✅ 大写旧目录规范名归位（`CALCHARO – 卡卡罗` → `Calcharo – 卡卡罗` 等 7 个）
 - ✅ 拼写变体识别（`Bernice`→柏妮思、`Ceasar`→凯撒、`Dailyn`→琉音 等 16 个）
 
-### hash 反查
+### HTML 反查
 - ✅ 真实 hash 反查：文件 MD5 / 图片内容 hash 均命中（返回 mod/目录/文件名）
+- ✅ 图片短名反查：GB 原名（`69b46e18405cc.jpg`）从 HTML 记录反查所属 mod
 - ✅ 增量更新：下载新 mod 后新 hash 立即可查（无需重建）
-- ✅ 双表重建：5267 条 GB 表 + 7650 条本地表（6000+ HTML 热缓存 ~1 秒）
+- ✅ 三表重建：GB 表 5227 条 + 本地表 11135 条 + HTML 原名表 30741 条（6000+ HTML 热缓存 ~1 秒）
 
 ### 健壮性
 - ✅ 恢复任务崩溃修复：目标目录已被移走 → 标记跳过（不再 ENOENT 崩溃）；写流 error 监听兜底

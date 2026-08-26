@@ -2,7 +2,7 @@
   "warehouses": {
     "characters": "角色",
     "weapons": "光锥",
-    "skins": "",
+    "skins": "角色/.角色",
     "enemies": "敌对物种",
     "npcs": "NPC",
     "ui": "UI",
@@ -102,7 +102,12 @@
     "Archer": "Archer",
     "Rin Tohsaka": "远坂凛",
     "Rin": "远坂凛",
-    "Pearl": "真珠"
+    "Pearl": "真珠",
+    "Dan Heng Permansor Terrae": "丹恒·腾荒",
+    "Gilgamesh": "吉尔伽美什",
+    "Saber": "阿尔托莉雅",
+    "Mortenax Blade": "千冶·刃",
+    "Silver Wolf Lv.999": "银狼·Lv.999"
   },
   "variants": {
     "黄泉": "Acheron",
@@ -219,6 +224,11 @@
     "夏蝶": "Castorice",
     "xia die": "Castorice",
     "瑶光": "Yao Guang",
-    "真珠": "Pearl"
+    "真珠": "Pearl",
+    "丹恒·腾荒": "Dan Heng Permansor Terrae",
+    "吉尔伽美什": "Gilgamesh",
+    "阿尔托莉雅": "Saber",
+    "千冶·刃": "Mortenax Blade",
+    "银狼·Lv.999": "Silver Wolf Lv.999"
   }
 }

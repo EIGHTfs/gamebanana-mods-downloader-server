@@ -78,9 +78,10 @@ try {
       <div id="taskMeta"></div>
       <div id="activeList" style="margin-top:6px"></div>
       <div class="row mt">
-        <label>并发数 <input type="number" id="concurrencyInput" min="1" max="16" value="4" style="width:70px"></label>
+        <label>并发数 <input type="number" id="concurrencyInput" min="1" max="32" value="4" style="width:70px"></label>
         <button class="ghost" id="concurrencyBtn" type="button">应用</button>
         <span class="hint">（仅此一处可改并发数）</span>
+        <div class="status" id="concurrencyStatus"></div>
       </div>
       <div id="taskList" class="mt"></div>
     </div>

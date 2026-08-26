@@ -310,11 +310,54 @@ function bindProgress() {
       return;
     }
   });
+  // 2026-08-26 修复：应用并发数按钮——照搜索的反馈模式（状态文字 + 按钮禁用恢复 + 成功/失败）
   $("#concurrencyBtn").addEventListener("click", async () => {
-    const v = parseInt($("#concurrencyInput").value, 10);
-    await api("/api/task/concurrency", "POST", { concurrency: v });
+    const btn = $("#concurrencyBtn");
+    const input = $("#concurrencyInput");
+    const st = $("#concurrencyStatus");
+    const v = parseInt(input.value, 10);
+    if (!v || v < 1) { if (st) { st.textContent = "并发数无效（至少 1）"; st.className = "status err"; } return; }
+    btn.disabled = true;
+    btn.textContent = "应用中…";
+    if (st) { st.textContent = "应用并发数…"; st.className = "status"; }
+    try {
+      const r = await api("/api/task/concurrency", "POST", { concurrency: v });
+      if (r && r.ok) {
+        input.value = r.concurrency;
+        if (st) { st.textContent = "✅ 并发数已设为 " + r.concurrency; st.className = "status ok"; }
+        // 立即拉最新任务刷新显示
+        try {
+          const t = await api("/api/task");
+          if (t && t.task) renderTask(t.task);
+        } catch (_) {}
+      } else {
+        if (st) { st.textContent = "应用失败：" + ((r && r.error) || "未知错误"); st.className = "status err"; }
+      }
+    } catch (e) {
+      if (st) { st.textContent = "应用失败：" + (e.message || String(e)); st.className = "status err"; }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "应用";
+    }
   });
   startTaskPoll();
+}
+
+// 2026-08-26 及时反馈：顶部浮动提示（2.5s 自动消失）
+function showFeedback(msg, type) {
+  let el = $("#feedbackToast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "feedbackToast";
+    el.style.cssText = "position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:9999;padding:10px 20px;border-radius:8px;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.3);transition:opacity .3s";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.background = type === "ok" ? "#1e7d32" : "#c62828";
+  el.style.color = "#fff";
+  el.style.opacity = "1";
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = "0"; }, 2500);
 }
 
 function startTaskPoll() {
@@ -344,6 +387,11 @@ function renderTask(task) {
     $("#resumeBtn").disabled = true;
     $("#stopBtn").disabled = true;
     $("#retryBtn").disabled = true;
+    // 2026-08-26 无任务时也显示 config 持久化的并发数
+    if (settings && settings.downloadConcurrency) {
+      const ci = $("#concurrencyInput");
+      if (ci && document.activeElement !== ci) ci.value = settings.downloadConcurrency;
+    }
     return;
   }
 
@@ -1030,6 +1078,14 @@ async function init() {
   bindMerge();
   bindTheme();
   bindLogout();
+  // 2026-08-26 修复：刷新后并发数显示 config 持久化值（无任务时 input 回填 downloadConcurrency）
+  try {
+    const sr = await api("/api/settings");
+    if (sr && sr.ok && sr.settings && sr.settings.downloadConcurrency) {
+      const ci = $("#concurrencyInput");
+      if (ci && document.activeElement !== ci) ci.value = sr.settings.downloadConcurrency;
+    }
+  } catch (_) {}
   loadGameSelects();
   await loadSettings();
   try {

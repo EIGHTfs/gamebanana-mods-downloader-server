@@ -1,8 +1,8 @@
 {
   "warehouses": {
-    "characters": "角色",
+    "characters": "共鸣者",
     "weapons": "武器",
-    "skins": "",
+    "skins": "角色/.角色",
     "enemies": "敌人",
     "npcs": "NPC",
     "ui": "UI",
@@ -65,7 +65,14 @@
     "Iuno": "尤诺",
     "Mornye": "莫宁",
     "Lucilla": "洛瑟菈",
-    "Lorelei": "罗蕾莱"
+    "Lorelei": "罗蕾莱",
+    "Lucy": "露西",
+    "Qingxiao": "清宵",
+    "Rebecca": "丽贝卡",
+    "Rover Female": "漂泊者（女）",
+    "Rover Male": "漂泊者（男）",
+    "Suisui": "穗穗",
+    "Yangyang: Xuanling": "秧秧·玄翎"
   },
   "variants": {
     "卡卡罗": "Calcharo",
@@ -129,6 +136,13 @@
     "尤诺": "Iuno",
     "莫宁": "Mornye",
     "洛瑟菈": "Lucilla",
-    "罗蕾莱": "Lorelei"
+    "罗蕾莱": "Lorelei",
+    "露西": "Lucy",
+    "清宵": "Qingxiao",
+    "丽贝卡": "Rebecca",
+    "漂泊者（女）": "Rover Female",
+    "漂泊者（男）": "Rover Male",
+    "穗穗": "Suisui",
+    "秧秧·玄翎": "Yangyang: Xuanling"
   }
 }

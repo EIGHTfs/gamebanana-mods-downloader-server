@@ -1,8 +1,8 @@
 {
   "warehouses": {
-    "characters": "角色",
+    "characters": "代理人",
     "weapons": "武器",
-    "skins": "",
+    "skins": "角色/.角色",
     "enemies": "敌人",
     "npcs": "NPC",
     "ui": "UI",
@@ -57,7 +57,18 @@
     "Hugo Vlad": "雨果·弗拉德",
     "Vivian": "薇薇安",
     "Trigger": "扳机",
-    "Pulchra": "波丽娜"
+    "Pulchra": "波丽娜",
+    "Belle": "铃",
+    "Yixuan": "仪玄",
+    "Yuzuha": "浮波柚叶",
+    "Dialyn": "琉音",
+    "Lucia": "卢西娅",
+    "Orphie": "奥菲丝",
+    "Seed": "席德",
+    "Nekomiya": "猫宫又奈",
+    "Ju Fufu": "橘福福",
+    "Ye Shun Guang": "叶瞬光",
+    "Wise": "哲"
   },
   "variants": {
     "朱鸢": "Zhu Yuan",
@@ -104,6 +115,17 @@
     "雨果·弗拉德": "Hugo Vlad",
     "薇薇安": "Vivian",
     "扳机": "Trigger",
-    "波丽娜": "Pulchra"
+    "波丽娜": "Pulchra",
+    "铃": "Belle",
+    "仪玄": "Yixuan",
+    "浮波柚叶": "Yuzuha",
+    "琉音": "Dialyn",
+    "卢西娅": "Lucia",
+    "奥菲丝": "Orphie",
+    "席德": "Seed",
+    "猫宫又奈": "Nekomiya",
+    "橘福福": "Ju Fufu",
+    "叶瞬光": "Ye Shun Guang",
+    "哲": "Wise"
   }
 }

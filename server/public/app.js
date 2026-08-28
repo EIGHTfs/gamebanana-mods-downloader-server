@@ -447,6 +447,11 @@ function fmtSpeed(s) {
   return s >= 1048576 ? (s / 1048576).toFixed(2) + " MB/s" : Math.round(s / 1024) + " KB/s";
 }
 
+// 2026-08-26 优化（用户反馈：网页刷新下载进度每次重新加载半天）：
+//   renderTask 每次 2 秒轮询都全量遍历 items 分组 + 重渲染 DOM（任务几百上千项时卡顿）。
+//   加分组指纹缓存：items/resultsMap 未变化时直接复用上次的 taskList HTML。
+let __renderTaskCache = { fingerprint: "", html: "" };
+
 function renderTask(task) {
   const stateText = { running: "下载中", preparing: "准备中", done: "已完成", paused: "已暂停", stopped: "已终止", error: "出错" };
   $("#taskState").textContent = task ? (stateText[task.status] || task.status) : "无任务";
@@ -530,6 +535,13 @@ function renderTask(task) {
     return;
   }
 
+  // 2026-08-26 优化：分组指纹缓存——items/resultsMap/status 未变则复用上次 HTML，避免全量重渲染
+  const fp = (task.items || []).length + ":" + Object.keys(task.resultsMap || {}).length + ":" + (task.doneCount || 0) + ":" + (task.status || "");
+  if (__renderTaskCache.fingerprint === fp && __renderTaskCache.html !== "") {
+    $("#taskList").innerHTML = __renderTaskCache.html;
+    return;
+  }
+
   const groups = [];
   const groupMap = new Map();
   (task.items || []).forEach((item, idx) => {
@@ -600,6 +612,8 @@ function renderTask(task) {
       ${rows}
     </div>`;
   }).join("");
+  __renderTaskCache.fingerprint = (task.items || []).length + ":" + Object.keys(task.resultsMap || {}).length + ":" + (task.doneCount || 0) + ":" + (task.status || "");
+  __renderTaskCache.html = html || '<div class="empty">暂无任务</div>';
   $("#taskList").innerHTML = html || '<div class="empty">暂无任务</div>';
 }
 

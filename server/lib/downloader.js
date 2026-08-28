@@ -615,27 +615,21 @@ async function prepareMod(url) {
   const trashDir = path.join(root, ".trash");
   const restored = [];
   if (fs.existsSync(trashDir)) {
-    // 垃圾桶文件清单（一次 readdir，含子目录内的文件：dup-归位-xxx/ 等）
-    // 2026-08-26 增强：垃圾桶内常见「dup-归位-<mod名>-<ts>/<文件>」子目录结构，
-    //   找回必须能命中子目录里的文件（如 dup-归位-Casual & OG Ganyu.../weebovz_..._7e4c1.rar）
-    let trashNames = [];
-    try { trashNames = fs.readdirSync(trashDir); } catch (_) {}
-    // 子目录内的文件也加入候选（带子目录路径）
-    for (const tn of [...trashNames]) {
-      const tp = path.join(trashDir, tn);
-      let st = null;
-      try { st = fs.statSync(tp); } catch (_) {}
-      if (st && st.isDirectory() && !tn.startsWith(".")) {
-        let sub = [];
-        try { sub = fs.readdirSync(tp); } catch (_) {}
-        for (const sf of sub) {
-          const sp = path.join(tp, sf);
-          let sst = null;
-          try { sst = fs.statSync(sp); } catch (_) {}
-          if (sst && sst.isFile()) trashNames.push(path.join(tn, sf)); // 存子路径
-        }
+    // 垃圾桶文件清单：递归扫描全部子目录（2026-08-26 修复——垃圾桶保留 relDir
+    //   结构后文件可能在 trash/角色/Test/[作者] Mod/img.jpg 多层深，必须递归收集，
+    //   找回时只按文件名匹配，不判断文件夹层级/深度）
+    const trashNames = [];
+    const collectTrash = (td, prefix) => {
+      let ents = [];
+      try { ents = fs.readdirSync(td, { withFileTypes: true }); } catch (_) { return; }
+      for (const e of ents) {
+        if (e.name.startsWith(".")) continue; // 隐藏文件跳过
+        const full = path.join(td, e.name);
+        if (e.isDirectory()) collectTrash(full, prefix + e.name + path.sep);
+        else if (e.isFile()) trashNames.push(prefix + e.name);
       }
-    }
+    };
+    collectTrash(trashDir, "");
     const trashSet = new Set(trashNames);
     // 2026-08-26 修复（实测 bottom_heavy_furina_top_heavy_）：垃圾桶旧版名与 GB 当前名
     //   不同（GB 加 2026_ 年份前缀 + _哈希后缀），精确匹配找回失败 → 加「核心名模糊匹配」。

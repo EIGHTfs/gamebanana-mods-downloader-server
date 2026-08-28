@@ -907,6 +907,11 @@ function downloadToFile(item, settings, onProgress) {
 }
 
 async function executeDownloadItem(item, settings, onProgress) {
+  // 2026-08-27 找回模式：不实际下载——需下载的项直接标记跳过（只做 prepareMod 的
+  //   垃圾桶找回/归位/HTML 生成）。放在所有判断最前，完全不影响正常下载流程。
+  if (settings && settings.restoreOnly && !item._skip && item.type !== "error" && item.type !== "skipped") {
+    return { path: item.path || "", ok: true, skipped: true, skipReason: "找回模式（不下载，仅归位/找回）" };
+  }
   if (item.type === "error") {
     return { path: item.path || "", ok: false, error: item.buildError || "构建下载任务失败" };
   }
@@ -994,7 +999,6 @@ async function doDownloadLoop() {
   // 2026-08-26 修复（实测：同一进程连续下载第二个任务时 doneCount=0 全部未执行）：
   // downloadIdx / resultsByIndex / modDirByItem 是模块级状态，新循环必须重置；
   // 恢复任务时从 task.resultsMap 重建已完成的项（consume 跳过），避免重启后重复下载。
-  // 2026-08-27 用户要求：找回模式从后往前处理（downloadIdx 初始化为末尾最后一个索引）
   downloadIdx = 0;
   resultsByIndex = new Map();
   if (task.resultsMap) {
@@ -1065,7 +1069,6 @@ async function doDownloadLoop() {
           continue;
         }
         const activeIdx = new Set((task.activeItems || []).map((a) => a.idx));
-        // 2026-08-27：倒序改在任务创建时 reverse pendingMods，这里统一正序
         while (downloadIdx < (task.items || []).length &&
                (resultsByIndex.has(downloadIdx) || activeIdx.has(downloadIdx))) downloadIdx++;
         const idx = downloadIdx;
@@ -1079,16 +1082,6 @@ async function doDownloadLoop() {
         const item = task.items[idx];
         const activeKey = item.path || item.url || `idx${idx}`;
         const activeItem = { key: activeKey, idx, name: item.displayName || item.path || item.url || "", modName: item.modName || "", type: item.type, received: 0, total: 0 };
-        // 2026-08-27 用户要求：找回模式（restoreOnly）——不实际下载，需下载的项直接跳过。
-        //   只做 prepareMod 的垃圾桶找回/归位/HTML 生成；并发数自动取大（prepareMod 很快）。
-        const restoreOnly = !!cfg.readConfig().restoreOnly;
-        if (restoreOnly) {
-          if (!item._skip && item.type !== "error" && item.type !== "skipped") {
-            resultsByIndex.set(idx, { path: item.path || "", ok: true, skipped: true, skipReason: "找回模式（不下载，仅归位/找回）" });
-          } else {
-            // 已存在/跳过/错误 保持原逻辑（走 executeDownloadItem 快速返回）
-          }
-        }
         if (!task.activeItems) task.activeItems = [];
         task.activeItems.push(activeItem);
         task.currentItem = activeItem;
@@ -1096,11 +1089,7 @@ async function doDownloadLoop() {
         saveTask();
         let r;
         try {
-          if (restoreOnly && !item._skip && item.type !== "error" && item.type !== "skipped") {
-            // 找回模式：跳过下载（结果已写入 resultsByIndex）
-            r = { path: item.path || "", ok: true, skipped: true, skipReason: "找回模式（不下载，仅归位/找回）" };
-          } else {
-            r = await executeDownloadItem(item, settings, (received, total) => {
+          r = await executeDownloadItem(item, settings, (received, total) => {
             activeItem.received = received;
             activeItem.total = total;
             const now = Date.now();
@@ -1114,7 +1103,6 @@ async function doDownloadLoop() {
               }
             }
           });
-          }
           resultsByIndex.set(idx, r);
         } catch (e) {
           resultsByIndex.set(idx, { path: item.path, ok: false, error: e.message || String(e) });
@@ -1305,8 +1293,7 @@ async function startDownloadTask({ mods }) {
 
   task = {
     status: "preparing",
-    // 2026-08-27：找回模式倒序——直接 reverse pendingMods（旧的 mod 到前面，正序处理=旧先），
-    //   produce/consume 保持统一正序，保证「准备好一个马上跳过」不卡。
+    // 2026-08-27 找回模式：pendingMods 倒序（旧的 mod 在前，先处理旧 mod 找回）
     pendingMods: (() => {
       const list = urls.map((u) => ({ profileUrl: u, name: u }));
       if (cfg.readConfig().restoreOnly) list.reverse();
@@ -1398,7 +1385,7 @@ function setConcurrency(n) {
   return { ok: true, concurrency: v };
 }
 
-// 2026-08-27 用户要求：找回模式开关——开启后下载任务不实际下载，只做找回/归位/HTML
+// 2026-08-27 找回模式开关：开启后不实际下载，只做找回/归位/HTML 生成
 function setRestoreMode(on) {
   const c = cfg.readConfig();
   c.restoreOnly = !!on;

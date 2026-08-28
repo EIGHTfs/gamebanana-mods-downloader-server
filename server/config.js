@@ -25,8 +25,7 @@ const DEFAULT_CONFIG = {
   sessionHours: 72,
   // 并发下载数
   downloadConcurrency: 4,
-  // 2026-08-27 用户要求：找回模式——开启后下载任务不实际下载文件，
-  //   只做 prepareMod（垃圾桶找回/归位/HTML 生成），需下载的项直接标记跳过
+  // 2026-08-27 找回模式：开启后不实际下载，只归位/找回/生成 HTML
   restoreOnly: false,
   // GB 登录检测用 NSFW mod（hide 可见性，未登录拉不到文件列表）
   gbCheckModId: 708465

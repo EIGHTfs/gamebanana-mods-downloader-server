@@ -994,7 +994,8 @@ async function doDownloadLoop() {
   // 2026-08-26 修复（实测：同一进程连续下载第二个任务时 doneCount=0 全部未执行）：
   // downloadIdx / resultsByIndex / modDirByItem 是模块级状态，新循环必须重置；
   // 恢复任务时从 task.resultsMap 重建已完成的项（consume 跳过），避免重启后重复下载。
-  downloadIdx = 0;
+  // 2026-08-27 用户要求：找回模式从后往前处理（downloadIdx 初始化为末尾最后一个索引）
+  downloadIdx = cfg.readConfig().restoreOnly ? Math.max(0, (task.items || []).length - 1) : 0;
   resultsByIndex = new Map();
   if (task.resultsMap) {
     for (const [k, v] of Object.entries(task.resultsMap)) {
@@ -1064,16 +1065,24 @@ async function doDownloadLoop() {
           continue;
         }
         const activeIdx = new Set((task.activeItems || []).map((a) => a.idx));
-        while (downloadIdx < (task.items || []).length &&
-               (resultsByIndex.has(downloadIdx) || activeIdx.has(downloadIdx))) downloadIdx++;
+        // 2026-08-27 用户要求：找回模式从后往前处理（JSON 列表反着来）——
+        //   先处理末尾的 mod；非找回模式照旧从前到后。
+        const restoreOnlyNow = !!cfg.readConfig().restoreOnly;
+        if (restoreOnlyNow) {
+          while (downloadIdx > 0 && (resultsByIndex.has(downloadIdx - 1) || activeIdx.has(downloadIdx - 1))) downloadIdx--;
+        } else {
+          while (downloadIdx < (task.items || []).length &&
+                 (resultsByIndex.has(downloadIdx) || activeIdx.has(downloadIdx))) downloadIdx++;
+        }
         const idx = downloadIdx;
-        if (idx >= (task.items || []).length) {
+        const exhausted = restoreOnlyNow ? idx <= 0 : idx >= (task.items || []).length;
+        if (exhausted) {
           // 生产者未完成则等待；produce 在等追加（waitingAppend）也不退出
           const stillProducing = task.buildIndex < (task.pendingMods || []).length || task.preparingItem || task.waitingAppend;
           if (stillProducing) { await new Promise((r) => setTimeout(r, 200)); continue; }
           return;
         }
-        downloadIdx++;
+        downloadIdx = restoreOnlyNow ? downloadIdx - 1 : downloadIdx + 1;
         const item = task.items[idx];
         const activeKey = item.path || item.url || `idx${idx}`;
         const activeItem = { key: activeKey, idx, name: item.displayName || item.path || item.url || "", modName: item.modName || "", type: item.type, received: 0, total: 0 };

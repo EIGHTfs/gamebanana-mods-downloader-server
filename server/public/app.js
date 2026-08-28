@@ -473,10 +473,21 @@ function bindProgress() {
       btn.textContent = "应用";
     }
   });
-  // 2026-08-27 用户要求：找回模式开关——开启后不实际下载，只归位/找回/生成 HTML
+  // 2026-08-27 用户要求：找回模式开关——开启后不实际下载，只归位/找回/生成 HTML；
+  //   只能无任务时控制（任务运行/暂停/准备中禁用）
   const rmToggle = $("#restoreModeToggle");
   if (rmToggle) {
     const rmHint = $("#restoreModeHint");
+    let __lastTaskStatus = null; // 当前任务状态（renderTask 更新）
+    window.__setRestoreModeDisabled = (task) => {
+      __lastTaskStatus = task ? task.status : null;
+      const busy = task && (task.status === "running" || task.status === "paused" || task.status === "preparing" || task.status === "done");
+      rmToggle.disabled = !!busy && task.status !== "stopped";
+      if (rmHint) {
+        if (rmToggle.disabled) rmHint.textContent = "有任务进行中/已暂停，停止或完成后才能修改";
+        else rmHint.textContent = rmToggle.checked ? "当前开启：需下载的项会直接跳过（只找回/归位）" : "当前关闭：正常下载";
+      }
+    };
     const applyRm = (on) => {
       rmToggle.checked = on;
       if (rmHint) {
@@ -487,6 +498,7 @@ function bindProgress() {
     // init 读取当前状态
     api("/api/task/restore-mode").then((r) => { if (r && r.ok) applyRm(r.restoreOnly); }).catch(() => {});
     rmToggle.addEventListener("change", async () => {
+      if (rmToggle.disabled) { rmToggle.checked = !rmToggle.checked; return; } // 有任务时禁止切换
       const on = rmToggle.checked;
       try {
         const r = await api("/api/task/restore-mode", "POST", { enabled: on });
@@ -541,6 +553,8 @@ let __renderTaskCache = { fingerprint: "", html: "" };
 function renderTask(task) {
   const stateText = { running: "下载中", preparing: "准备中", done: "已完成", paused: "已暂停", stopped: "已终止", error: "出错" };
   $("#taskState").textContent = task ? (stateText[task.status] || task.status) : "无任务";
+  // 2026-08-27：找回模式开关——有任务(运行/暂停/准备/完成)时禁用，仅无任务可改
+  if (window.__setRestoreModeDisabled) window.__setRestoreModeDisabled(task);
   if (!task) {
     $("#progressFill").style.width = "0%";
     $("#taskMeta").textContent = "尚未开始下载";

@@ -2,7 +2,7 @@
   "warehouses": {
     "characters": "代理人",
     "weapons": "武器",
-    "skins": "角色/.角色",
+    "skins": "代理人/.代理人",
     "enemies": "敌人",
     "npcs": "NPC",
     "ui": "UI",
@@ -68,7 +68,13 @@
     "Nekomiya": "猫宫又奈",
     "Ju Fufu": "橘福福",
     "Ye Shun Guang": "叶瞬光",
-    "Wise": "哲"
+    "Wise": "哲",
+    "Anby Demara": "安比·德玛拉",
+    "Soldier 0 Anby": "安比·零号特工",
+    "Nekomiya Mana": "猫又·玛娜",
+    "Ellen Joe": "艾莲·乔",
+    "Alexandrina Sebastiane": "亚历山德丽娜·莎芭丝缇安",
+    "Alice Thymefield": "爱丽丝·泰姆菲尔德"
   },
   "variants": {
     "朱鸢": "Zhu Yuan",

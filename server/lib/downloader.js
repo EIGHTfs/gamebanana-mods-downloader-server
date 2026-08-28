@@ -995,7 +995,7 @@ async function doDownloadLoop() {
   // downloadIdx / resultsByIndex / modDirByItem 是模块级状态，新循环必须重置；
   // 恢复任务时从 task.resultsMap 重建已完成的项（consume 跳过），避免重启后重复下载。
   // 2026-08-27 用户要求：找回模式从后往前处理（downloadIdx 初始化为末尾最后一个索引）
-  downloadIdx = cfg.readConfig().restoreOnly ? Math.max(0, (task.items || []).length - 1) : 0;
+  downloadIdx = 0;
   resultsByIndex = new Map();
   if (task.resultsMap) {
     for (const [k, v] of Object.entries(task.resultsMap)) {
@@ -1008,15 +1008,10 @@ async function doDownloadLoop() {
   try {
     // ---------- 生产者：逐个 mod 准备（第一步→第二步→第三步）----------
     const produce = async () => {
-      // 2026-08-27 用户要求：找回模式倒序——旧的 mod 在后面，先处理末尾的（旧 mod 先找回）
-      const restoreOnlyProduce = !!cfg.readConfig().restoreOnly;
       while (task && !task.abort && !task.pause) {
         // 2026-08-26 追加任务立刻开始：pendingMods 处理完不退出——若还有下载项在跑，
         //   等待新追加（task.pendingMods 增长）继续生产；全部完成才退出
-        const allDone = restoreOnlyProduce
-          ? task.buildIndex <= 0
-          : task.buildIndex >= (task.pendingMods || []).length;
-        if (allDone) {
+        if (task.buildIndex >= (task.pendingMods || []).length) {
           // 2026-08-26 追加任务立刻开始：有活跃下载/未完成项 → produce 等待新追加
           const stillActive = (task.activeItems || []).length > 0 || ((task.items || []).length > 0 && resultsByIndex.size < (task.items || []).length);
           if (stillActive) {
@@ -1029,13 +1024,11 @@ async function doDownloadLoop() {
           break;
         }
         task.waitingAppend = false;
-        // 2026-08-27：找回模式从后往前取 pendingMods（先处理末尾的旧 mod）
-        const myIdx = restoreOnlyProduce ? task.buildIndex - 1 : task.buildIndex;
-        if (restoreOnlyProduce) task.buildIndex--;
-        else task.buildIndex++;
+        const myIdx = task.buildIndex;
+        task.buildIndex++;
         const modRef = task.pendingMods[myIdx];
         task.preparingItem = { name: modRef.name || modRef.profileUrl, type: "preparing" };
-        task.message = `准备 ${(restoreOnlyProduce ? task.pendingMods.length - myIdx : myIdx + 1)}/${(task.pendingMods || []).length} · 已完成 ${resultsByIndex.size} 项`;
+        task.message = `准备 ${myIdx + 1}/${(task.pendingMods || []).length} · 已完成 ${resultsByIndex.size} 项`;
         saveTask();
         try {
           const res = await prepareMod(modRef.profileUrl);
@@ -1072,24 +1065,17 @@ async function doDownloadLoop() {
           continue;
         }
         const activeIdx = new Set((task.activeItems || []).map((a) => a.idx));
-        // 2026-08-27 用户要求：找回模式从后往前处理（JSON 列表反着来）——
-        //   先处理末尾的 mod；非找回模式照旧从前到后。
-        const restoreOnlyNow = !!cfg.readConfig().restoreOnly;
-        if (restoreOnlyNow) {
-          while (downloadIdx > 0 && (resultsByIndex.has(downloadIdx - 1) || activeIdx.has(downloadIdx - 1))) downloadIdx--;
-        } else {
-          while (downloadIdx < (task.items || []).length &&
-                 (resultsByIndex.has(downloadIdx) || activeIdx.has(downloadIdx))) downloadIdx++;
-        }
+        // 2026-08-27：倒序改在任务创建时 reverse pendingMods，这里统一正序
+        while (downloadIdx < (task.items || []).length &&
+               (resultsByIndex.has(downloadIdx) || activeIdx.has(downloadIdx))) downloadIdx++;
         const idx = downloadIdx;
-        const exhausted = restoreOnlyNow ? idx <= 0 : idx >= (task.items || []).length;
-        if (exhausted) {
+        if (idx >= (task.items || []).length) {
           // 生产者未完成则等待；produce 在等追加（waitingAppend）也不退出
           const stillProducing = task.buildIndex < (task.pendingMods || []).length || task.preparingItem || task.waitingAppend;
           if (stillProducing) { await new Promise((r) => setTimeout(r, 200)); continue; }
           return;
         }
-        downloadIdx = restoreOnlyNow ? downloadIdx - 1 : downloadIdx + 1;
+        downloadIdx++;
         const item = task.items[idx];
         const activeKey = item.path || item.url || `idx${idx}`;
         const activeItem = { key: activeKey, idx, name: item.displayName || item.path || item.url || "", modName: item.modName || "", type: item.type, received: 0, total: 0 };
@@ -1319,9 +1305,14 @@ async function startDownloadTask({ mods }) {
 
   task = {
     status: "preparing",
-    pendingMods: urls.map((u) => ({ profileUrl: u, name: u })),
-    // 2026-08-27：找回模式倒序——buildIndex 从末尾开始（旧的先处理）
-    buildIndex: cfg.readConfig().restoreOnly ? urls.length : 0,
+    // 2026-08-27：找回模式倒序——直接 reverse pendingMods（旧的 mod 到前面，正序处理=旧先），
+    //   produce/consume 保持统一正序，保证「准备好一个马上跳过」不卡。
+    pendingMods: (() => {
+      const list = urls.map((u) => ({ profileUrl: u, name: u }));
+      if (cfg.readConfig().restoreOnly) list.reverse();
+      return list;
+    })(),
+    buildIndex: 0,
     items: [],
     currentIndex: 0,
     results: [],

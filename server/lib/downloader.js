@@ -1008,10 +1008,15 @@ async function doDownloadLoop() {
   try {
     // ---------- 生产者：逐个 mod 准备（第一步→第二步→第三步）----------
     const produce = async () => {
+      // 2026-08-27 用户要求：找回模式倒序——旧的 mod 在后面，先处理末尾的（旧 mod 先找回）
+      const restoreOnlyProduce = !!cfg.readConfig().restoreOnly;
       while (task && !task.abort && !task.pause) {
         // 2026-08-26 追加任务立刻开始：pendingMods 处理完不退出——若还有下载项在跑，
         //   等待新追加（task.pendingMods 增长）继续生产；全部完成才退出
-        if (task.buildIndex >= (task.pendingMods || []).length) {
+        const allDone = restoreOnlyProduce
+          ? task.buildIndex <= 0
+          : task.buildIndex >= (task.pendingMods || []).length;
+        if (allDone) {
           // 2026-08-26 追加任务立刻开始：有活跃下载/未完成项 → produce 等待新追加
           const stillActive = (task.activeItems || []).length > 0 || ((task.items || []).length > 0 && resultsByIndex.size < (task.items || []).length);
           if (stillActive) {
@@ -1024,11 +1029,13 @@ async function doDownloadLoop() {
           break;
         }
         task.waitingAppend = false;
-        const myIdx = task.buildIndex;
-        task.buildIndex++;
+        // 2026-08-27：找回模式从后往前取 pendingMods（先处理末尾的旧 mod）
+        const myIdx = restoreOnlyProduce ? task.buildIndex - 1 : task.buildIndex;
+        if (restoreOnlyProduce) task.buildIndex--;
+        else task.buildIndex++;
         const modRef = task.pendingMods[myIdx];
         task.preparingItem = { name: modRef.name || modRef.profileUrl, type: "preparing" };
-        task.message = `准备 ${myIdx + 1}/${(task.pendingMods || []).length} · 已完成 ${resultsByIndex.size} 项`;
+        task.message = `准备 ${(restoreOnlyProduce ? task.pendingMods.length - myIdx : myIdx + 1)}/${(task.pendingMods || []).length} · 已完成 ${resultsByIndex.size} 项`;
         saveTask();
         try {
           const res = await prepareMod(modRef.profileUrl);
@@ -1313,7 +1320,8 @@ async function startDownloadTask({ mods }) {
   task = {
     status: "preparing",
     pendingMods: urls.map((u) => ({ profileUrl: u, name: u })),
-    buildIndex: 0,
+    // 2026-08-27：找回模式倒序——buildIndex 从末尾开始（旧的先处理）
+    buildIndex: cfg.readConfig().restoreOnly ? urls.length : 0,
     items: [],
     currentIndex: 0,
     results: [],

@@ -338,25 +338,40 @@ async function fetchRoleCatIds(gameId) {
 const charCache = new Map(); // gameId -> { at, chars: [string] }
 const CHAR_PAGE_CAP = 10; // 最多翻 10 页（500 个最新 mod，足够覆盖近期活跃角色）
 const CHAR_CACHE_MS = 10 * 60 * 1000;
-// 2026-08-27 用户要求：角色列表持久化到 json/role-cache.json——搜索页/设置页复用，
-//   默认读 JSON（不用每次翻 GB 页），设置页按钮手动刷新（forceRefresh）。
-const CHAR_CACHE_FILE = path.join(__dirname, "..", "..", "json", "role-cache.json");
+// 2026-08-27 用户要求：角色列表持久化到 json/role/ 文件夹，每个游戏一个 JSON 文件
+//   （文件名 = 游戏名，如 json/role/Genshin Impact.json / json/role/Zenless Zone Zero.json）。
+//   搜索页/设置页复用，默认读文件（不用每次翻 GB 页），设置页按钮手动刷新（forceRefresh）。
+const CHAR_CACHE_DIR = path.join(__dirname, "..", "..", "json", "role");
+const LEGACY_CACHE_FILE = path.join(__dirname, "..", "..", "json", "role-cache.json");
 
-function loadRoleCache() {
-  try { return JSON.parse(require("fs").readFileSync(CHAR_CACHE_FILE, "utf8")); } catch (_) { return {}; }
+function roleCachePath(gameName) {
+  return path.join(CHAR_CACHE_DIR, String(gameName || "unknown").replace(/[\\/:*?"<>|]/g, "_") + ".json");
 }
-function saveRoleCache(obj) {
-  try { require("fs").mkdirSync(path.dirname(CHAR_CACHE_FILE), { recursive: true }); require("fs").writeFileSync(CHAR_CACHE_FILE, JSON.stringify(obj, null, 2)); } catch (_) {}
+function loadRoleCache(gameName) {
+  try {
+    const d = JSON.parse(require("fs").readFileSync(roleCachePath(gameName), "utf8"));
+    if (d && Array.isArray(d.characters)) return d;
+  } catch (_) {}
+  // 兼容旧版：单文件 role-cache.json 里的 gameId key / 游戏名 key
+  try {
+    const legacy = JSON.parse(require("fs").readFileSync(LEGACY_CACHE_FILE, "utf8"));
+    return legacy[gameName] || legacy[String(cfg.gameIdOf(gameName))] || null;
+  } catch (_) {}
+  return null;
+}
+function saveRoleCache(gameName, obj) {
+  try {
+    require("fs").mkdirSync(CHAR_CACHE_DIR, { recursive: true });
+    require("fs").writeFileSync(roleCachePath(gameName), JSON.stringify({ gameId: obj.gameId, characters: obj.characters, at: obj.at }, null, 2));
+  } catch (_) {}
 }
 
 async function fetchGameCharacterList(gameId, gameName, forceRefresh) {
   if (!gameId) return [];
   const now = Date.now();
-  // 2026-08-27 用户要求：按游戏名分类保存（key = 游戏名，值含 gameId）——兼容旧 gameId key
   const gameKey = String(gameName && gameName.trim() ? gameName : gameId);
   // 1) JSON 持久化缓存（默认）：有且未强制刷新 → 直接返回（含本地 mapping 补全）
-  const jsonCache = loadRoleCache();
-  const jc = jsonCache[gameKey] || jsonCache[String(gameId)];
+  const jc = loadRoleCache(gameKey);
   if (!forceRefresh && jc && Array.isArray(jc.characters) && jc.characters.length) {
     // 合并本地 mapping roles（可能后续手动加过角色）
     const merged = new Set(jc.characters);
@@ -399,10 +414,8 @@ async function fetchGameCharacterList(gameId, gameName, forceRefresh) {
   } catch (_) {}
   const list = [...chars].sort((a, b) => a.localeCompare(b, "en"));
   charCache.set(gameKey, { at: now, chars: list });
-  // 3) 写回 JSON 持久化（按游戏名 key，值含 gameId；顺带删旧 gameId key）
-  jsonCache[gameKey] = { gameId, characters: list, at: now };
-  if (String(gameId) !== gameKey) delete jsonCache[String(gameId)];
-  saveRoleCache(jsonCache);
+  // 3) 写回 JSON 持久化（json/role/<游戏名>.json）
+  saveRoleCache(gameKey, { gameId, characters: list, at: now });
   return list;
 }
 

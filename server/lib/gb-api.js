@@ -277,6 +277,61 @@ async function fetchOnePage(gameId, page, signal) {
   return { records, hasMore: records.length >= PAGE_SIZE };
 }
 
+// ---------- 按角色/分类浏览（2026-08-27 用户要求）----------
+// GB Index API 支持 _aFilters[Generic_Category]=<catId> 过滤（catId 从
+//   _aSubCategory._sProfileUrl 的 /mods/cats/<id> 提取）。关键词搜索只按标题匹配，
+//   角色分类浏览能拉出该角色全部 mod（如 Jane Doe → cat 30580 → 144 个）。
+async function fetchModsByCategory(gameId, catId, page, perpage = 50) {
+  const url =
+    `${API_BASE}/Index?_nPage=${page}&_nPerpage=${perpage}` +
+    `&_aFilters%5BGeneric_Game%5D=${gameId}` +
+    `&_aFilters%5BGeneric_Category%5D=${catId}` +
+    `&_sSort=Generic_NewAndUpdated`;
+  const data = await fetchJson(url, {}, 2);
+  const records = Array.isArray(data._aRecords) ? data._aRecords : [];
+  return {
+    records: records.map((r) => ({
+      id: r._idRow,
+      name: r._sName || "",
+      profileUrl: r._sProfileUrl || ("https://gamebanana.com/mods/" + r._idRow),
+      author: (r._aSubmitter && r._aSubmitter._sName) || "",
+      isNsfw: isNsfwRecord(r)
+    })),
+    hasMore: records.length >= perpage
+  };
+}
+
+// 角色名 → cat ID：翻最新页收集 _aSubCategory（缓存 10 分钟）
+const catIdCache = new Map(); // gameId -> { at, map: {roleName: catId} }
+const CAT_CACHE_MS = 10 * 60 * 1000;
+
+async function fetchRoleCatIds(gameId) {
+  if (!gameId) return {};
+  const now = Date.now();
+  const hit = catIdCache.get(String(gameId));
+  if (hit && now - hit.at < CAT_CACHE_MS) return hit.map;
+  const map = {};
+  for (let page = 1; page <= 8; page++) {
+    try {
+      const url =
+        `${API_BASE}/Index?_nPage=${page}&_nPerpage=50` +
+        `&_aFilters%5BGeneric_Game%5D=${gameId}&_sSort=Generic_NewAndUpdated`;
+      const data = await fetchJson(url, {}, 1);
+      for (const rec of data._aRecords || []) {
+        const sub = rec._aSubCategory;
+        if (sub && sub._sName && sub._sProfileUrl) {
+          const id = String(sub._sProfileUrl).match(/\/mods\/cats\/(\d+)/);
+          if (id && !(sub._sName in map)) map[sub._sName] = id[1];
+        }
+      }
+      if ((data._aRecords || []).length < 50) break;
+    } catch (_) { break; }
+    await new Promise((r) => setTimeout(r, 350));
+  }
+  catIdCache.set(String(gameId), { at: now, map });
+  return map;
+}
+
 // ---------- 游戏角色列表（GB 获取，2026-08-26 用户要求）----------
 // 翻该游戏最新若干页 Mod/Index，收集 _aSubCategory（角色/具体项名，如 Sandrone/Odette）；
 // 合并本地 mapping roles 的英文 key（补全无近期 mod 的角色）。内存缓存 10 分钟。
@@ -356,6 +411,8 @@ module.exports = {
   processPageRecords,
   fetchOnePage,
   searchGameBananaMods,
+  fetchModsByCategory,
+  fetchRoleCatIds,
   normalizeKeyword,
   fetchGameCharacterList,
   fetchGameInfo,

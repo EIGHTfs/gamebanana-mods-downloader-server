@@ -83,6 +83,12 @@ try {
         <span class="hint">（仅此一处可改并发数）</span>
         <div class="status" id="concurrencyStatus"></div>
       </div>
+      <div class="row mt">
+        <label title="开启后下载任务不实际下载文件，只做垃圾桶找回/归位/生成 HTML，需下载的项直接跳过">
+          <input type="checkbox" id="restoreModeToggle"> 找回模式（不下载，仅找回/归位）
+        </label>
+        <span class="hint" id="restoreModeHint"></span>
+      </div>
       <div id="taskList" class="mt"></div>
     </div>
   </div>
@@ -251,7 +257,7 @@ try {
   </div>
 </div>
 
-<script src="app.js?v=20260827-rolecache"></script>
+<script src="app.js?v=20260827-restoremode"></script>
 
 <!-- 目录选择弹窗（设置页「读取本地选择」下载路径） -->
 <div class="modal-mask" id="browseMask" style="display:none">

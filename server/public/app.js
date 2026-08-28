@@ -473,6 +473,31 @@ function bindProgress() {
       btn.textContent = "应用";
     }
   });
+  // 2026-08-27 用户要求：找回模式开关——开启后不实际下载，只归位/找回/生成 HTML
+  const rmToggle = $("#restoreModeToggle");
+  if (rmToggle) {
+    const rmHint = $("#restoreModeHint");
+    const applyRm = (on) => {
+      rmToggle.checked = on;
+      if (rmHint) {
+        rmHint.textContent = on ? "当前开启：需下载的项会直接跳过（只找回/归位）" : "当前关闭：正常下载";
+        rmHint.style.color = on ? "#c62828" : "";
+      }
+    };
+    // init 读取当前状态
+    api("/api/task/restore-mode").then((r) => { if (r && r.ok) applyRm(r.restoreOnly); }).catch(() => {});
+    rmToggle.addEventListener("change", async () => {
+      const on = rmToggle.checked;
+      try {
+        const r = await api("/api/task/restore-mode", "POST", { enabled: on });
+        if (r && r.ok) { applyRm(r.restoreOnly); if (rmHint) rmHint.textContent += "（已保存）"; }
+        else { applyRm(!on); if (rmHint) rmHint.textContent = "保存失败：" + ((r && r.error) || "未知错误"); }
+      } catch (e) {
+        applyRm(!on);
+        if (rmHint) rmHint.textContent = "保存失败：" + (e.message || String(e));
+      }
+    });
+  }
   startTaskPoll();
 }
 

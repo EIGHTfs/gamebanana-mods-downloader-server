@@ -449,6 +449,14 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       return sendJson(res, 200, downloader.setConcurrency(body.concurrency));
     }
+    // 2026-08-27 用户要求：找回模式开关（不实际下载，只归位/找回/生成 HTML）
+    if (method === "POST" && pathname === "/api/task/restore-mode") {
+      const body = await readBody(req);
+      return sendJson(res, 200, downloader.setRestoreMode(body.enabled));
+    }
+    if (method === "GET" && pathname === "/api/task/restore-mode") {
+      return sendJson(res, 200, { ok: true, restoreOnly: downloader.getRestoreMode() });
+    }
 
     // ---- 本地目录浏览（设置页「读取本地选择」下载路径；用户原话 2026-08-26）----
     if (method === "GET" && pathname === "/api/browse") {

@@ -1077,6 +1077,16 @@ async function doDownloadLoop() {
         const item = task.items[idx];
         const activeKey = item.path || item.url || `idx${idx}`;
         const activeItem = { key: activeKey, idx, name: item.displayName || item.path || item.url || "", modName: item.modName || "", type: item.type, received: 0, total: 0 };
+        // 2026-08-27 用户要求：找回模式（restoreOnly）——不实际下载，需下载的项直接跳过。
+        //   只做 prepareMod 的垃圾桶找回/归位/HTML 生成；并发数自动取大（prepareMod 很快）。
+        const restoreOnly = !!cfg.readConfig().restoreOnly;
+        if (restoreOnly) {
+          if (!item._skip && item.type !== "error" && item.type !== "skipped") {
+            resultsByIndex.set(idx, { path: item.path || "", ok: true, skipped: true, skipReason: "找回模式（不下载，仅归位/找回）" });
+          } else {
+            // 已存在/跳过/错误 保持原逻辑（走 executeDownloadItem 快速返回）
+          }
+        }
         if (!task.activeItems) task.activeItems = [];
         task.activeItems.push(activeItem);
         task.currentItem = activeItem;
@@ -1084,7 +1094,11 @@ async function doDownloadLoop() {
         saveTask();
         let r;
         try {
-          r = await executeDownloadItem(item, settings, (received, total) => {
+          if (restoreOnly && !item._skip && item.type !== "error" && item.type !== "skipped") {
+            // 找回模式：跳过下载（结果已写入 resultsByIndex）
+            r = { path: item.path || "", ok: true, skipped: true, skipReason: "找回模式（不下载，仅归位/找回）" };
+          } else {
+            r = await executeDownloadItem(item, settings, (received, total) => {
             activeItem.received = received;
             activeItem.total = total;
             const now = Date.now();
@@ -1098,6 +1112,7 @@ async function doDownloadLoop() {
               }
             }
           });
+          }
           resultsByIndex.set(idx, r);
         } catch (e) {
           resultsByIndex.set(idx, { path: item.path, ok: false, error: e.message || String(e) });
@@ -1375,6 +1390,17 @@ function setConcurrency(n) {
   return { ok: true, concurrency: v };
 }
 
+// 2026-08-27 用户要求：找回模式开关——开启后下载任务不实际下载，只做找回/归位/HTML
+function setRestoreMode(on) {
+  const c = cfg.readConfig();
+  c.restoreOnly = !!on;
+  cfg.writeConfig(c);
+  return { ok: true, restoreOnly: c.restoreOnly };
+}
+function getRestoreMode() {
+  return !!cfg.readConfig().restoreOnly;
+}
+
 // 2026-08-26 用户要求加回：跳过失败项——按 path 或 url 匹配，标记 skipped
 // （前端立即消失；不写 skip-list，下次重新发起下载会再尝试——与旧项目最终行为一致）
 // 2026-08-26 修复（用户反馈跳过/重试不能正常使用）：
@@ -1512,6 +1538,8 @@ module.exports = {
   resumeTask,
   stopTask,
   setConcurrency,
+  setRestoreMode,
+  getRestoreMode,
   retryFailed,
   skipItem,
   skipAllFailed,

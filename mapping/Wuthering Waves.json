@@ -2,7 +2,7 @@
   "warehouses": {
     "characters": "共鸣者",
     "weapons": "武器",
-    "skins": "角色/.角色",
+    "skins": "共鸣者/.共鸣者",
     "enemies": "敌人",
     "npcs": "NPC",
     "ui": "UI",

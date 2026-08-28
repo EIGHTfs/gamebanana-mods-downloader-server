@@ -285,6 +285,67 @@ async function keywordSearch() {
 function bindKeywordSearch() {
   $("#kwSearchBtn").addEventListener("click", keywordSearch);
   $("#kwInput").addEventListener("keydown", (e) => { if (e.key === "Enter") keywordSearch(); });
+
+  // ---- 2026-08-27 用户要求：搜索页「选角色」——从香蕉网获取角色列表（同设置页手动添加映射的机制，仓库目录写死"角色"）----
+  const roleInput = $("#kwRoleInput");
+  const roleCombo = $("#kwRoleCombo");
+  let kwRoleChars = [];
+  // 选游戏后加载角色列表（照搬设置页 loadGbCharacters，独立存 kwRoleChars）
+  $("#searchGameSelect").addEventListener("change", async () => {
+    const game = $("#searchGameSelect").value;
+    if (!game) { roleInput.disabled = true; roleInput.value = ""; kwRoleChars = []; return; }
+    roleInput.disabled = false;
+    roleInput.placeholder = "加载角色…";
+    const st = $("#kwStatus");
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await api("/api/gb-characters?game=" + encodeURIComponent(game));
+        if (!r.ok) throw new Error(r.error || "获取失败");
+        kwRoleChars = r.characters || [];
+        roleInput.placeholder = "输入过滤，如 Od → Odette";
+        if (st) { st.textContent = `已加载 ${kwRoleChars.length} 个角色（选角色后自动搜索）`; st.className = "status ok"; }
+        return;
+      } catch (e) {
+        if (attempt === 0) { if (st) { st.textContent = "获取角色列表失败，重试…"; st.className = "status"; } await new Promise((r2) => setTimeout(r2, 1200)); }
+        else { if (st) { st.textContent = "获取角色列表失败: " + e.message; st.className = "status err"; } roleInput.placeholder = "加载失败，可手动输入"; }
+      }
+    }
+  });
+  // 自绘过滤下拉（照搬设置页 renderCombo）
+  function renderRoleCombo(filter) {
+    const q = String(filter || "").trim().toLowerCase();
+    const matched = q ? kwRoleChars.filter((c) => c.toLowerCase().includes(q)) : kwRoleChars;
+    const shown = matched.slice(0, 20);
+    if (!shown.length) { roleCombo.innerHTML = '<div class="combo-empty">无匹配角色</div>'; roleCombo.style.display = "block"; return; }
+    roleCombo.innerHTML = shown.map((c) => `<div class="combo-item" data-v="${esc(c)}">${esc(c)}</div>`).join("");
+    roleCombo.style.display = "block";
+  }
+  roleInput.addEventListener("focus", () => { if (!roleInput.disabled) renderRoleCombo(roleInput.value); });
+  roleInput.addEventListener("input", () => renderRoleCombo(roleInput.value));
+  roleInput.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") {
+      const items = document.querySelectorAll("#kwRoleCombo .combo-item");
+      if (items.length) { e.preventDefault(); const cur = document.querySelector("#kwRoleCombo .combo-item.hover") || items[0]; cur.classList.remove("hover"); (cur.nextElementSibling || items[0]).classList.add("hover"); }
+    } else if (e.key === "ArrowUp") {
+      const items = document.querySelectorAll("#kwRoleCombo .combo-item");
+      if (items.length) { e.preventDefault(); const cur = document.querySelector("#kwRoleCombo .combo-item.hover") || items[0]; cur.classList.remove("hover"); (cur.previousElementSibling || items[items.length - 1]).classList.add("hover"); }
+    } else if (e.key === "Enter") {
+      const cur = document.querySelector("#kwRoleCombo .combo-item.hover");
+      if (cur) { e.preventDefault(); roleInput.value = cur.dataset.v; roleCombo.style.display = "none"; pickRole(cur.dataset.v); }
+    } else if (e.key === "Escape") {
+      roleCombo.style.display = "none";
+    }
+  });
+  document.addEventListener("click", (e) => {
+    const item = e.target.closest && e.target.closest("#kwRoleCombo .combo-item");
+    if (item) { roleInput.value = item.dataset.v; roleCombo.style.display = "none"; pickRole(item.dataset.v); return; }
+    if (!e.target.closest("#kwRoleInput") && !e.target.closest("#kwRoleCombo")) roleCombo.style.display = "none";
+  });
+  // 选中角色 → 填入关键词并自动搜索（英文名直接搜，含变体合并）
+  function pickRole(name) {
+    $("#kwInput").value = name;
+    keywordSearch();
+  }
 }
 
 function startSearchPoll() {

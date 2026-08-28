@@ -99,6 +99,10 @@ try {
           </select>
         </label>
         <label>关键词 <input type="text" id="kwInput" placeholder="如 Sandrone、桑多涅、Lingerie" style="width:240px"></label>
+        <div style="position:relative">
+          <label>选角色 <input type="text" id="kwRoleInput" placeholder="输入过滤，如 Od → Odette" style="width:150px" disabled autocomplete="off" title="从香蕉网获取该游戏角色列表，选中后自动填入关键词并搜索"></label>
+          <div class="combo-list" id="kwRoleCombo" style="display:none"></div>
+        </div>
         <button class="primary" id="kwSearchBtn" type="button">搜索</button>
       </div>
       <div class="status" id="kwStatus"></div>
@@ -246,7 +250,7 @@ try {
   </div>
 </div>
 
-<script src="app.js?v=20260827-renderfast"></script>
+<script src="app.js?v=20260827-roleselect"></script>
 
 <!-- 目录选择弹窗（设置页「读取本地选择」下载路径） -->
 <div class="modal-mask" id="browseMask" style="display:none">

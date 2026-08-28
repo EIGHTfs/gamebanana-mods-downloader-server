@@ -352,10 +352,11 @@ function saveRoleCache(obj) {
 async function fetchGameCharacterList(gameId, gameName, forceRefresh) {
   if (!gameId) return [];
   const now = Date.now();
-  const gameKey = String(gameId);
+  // 2026-08-27 用户要求：按游戏名分类保存（key = 游戏名，值含 gameId）——兼容旧 gameId key
+  const gameKey = String(gameName && gameName.trim() ? gameName : gameId);
   // 1) JSON 持久化缓存（默认）：有且未强制刷新 → 直接返回（含本地 mapping 补全）
   const jsonCache = loadRoleCache();
-  const jc = jsonCache[gameKey];
+  const jc = jsonCache[gameKey] || jsonCache[String(gameId)];
   if (!forceRefresh && jc && Array.isArray(jc.characters) && jc.characters.length) {
     // 合并本地 mapping roles（可能后续手动加过角色）
     const merged = new Set(jc.characters);
@@ -398,8 +399,9 @@ async function fetchGameCharacterList(gameId, gameName, forceRefresh) {
   } catch (_) {}
   const list = [...chars].sort((a, b) => a.localeCompare(b, "en"));
   charCache.set(gameKey, { at: now, chars: list });
-  // 3) 写回 JSON 持久化
-  jsonCache[gameKey] = { characters: list, at: now };
+  // 3) 写回 JSON 持久化（按游戏名 key，值含 gameId；顺带删旧 gameId key）
+  jsonCache[gameKey] = { gameId, characters: list, at: now };
+  if (String(gameId) !== gameKey) delete jsonCache[String(gameId)];
   saveRoleCache(jsonCache);
   return list;
 }

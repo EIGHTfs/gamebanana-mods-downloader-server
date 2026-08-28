@@ -310,18 +310,48 @@ const server = http.createServer(async (req, res) => {
         q = gbApi.normalizeKeyword(game, q); // 桑多涅 → Sandrone
         const perpage = Math.min(parseInt(parsed.query.perpage, 10) || 50, 100);
         const maxResults = Math.min(parseInt(parsed.query.max || 100, 10) || 100, 500);
+        // 2026-08-27 用户要求：合并搜索——搜角色名时自动补搜变体（短名/中文），合并去重。
+        //   例：搜 "Jane Doe" → 变体 ["Jane Doe", "Jane", "简·杜", "简"]，各自搜后合并。
+        //   GB 关键词搜索只按标题匹配，标题含 "Jane" 但非 "Jane Doe" 的 mod 需变体才能搜到。
+        const genVariants = (base) => {
+          const vs = new Set();
+          vs.add(base);
+          // 短名：去全名后缀（Jane Doe → Jane；Burnice White → Burnice）
+          const parts = String(base).split(" ");
+          if (parts.length > 1) {
+            vs.add(parts[0]);
+            // 去掉中间名保留前两个（Anby Demara → Anby）
+            if (parts.length > 2) vs.add(parts[0] + " " + parts[1]);
+          }
+          // 中文变体：从映射 roles 反查（简·杜/简）
+          try {
+            const map = cfg.readGameMapping(game);
+            for (const [en, zh] of Object.entries((map && map.roles) || {})) {
+              if (String(en).toLowerCase() === String(base).toLowerCase()) {
+                vs.add(zh);
+                // 中文短名（取 · 前段）
+                const zhShort = String(zh).split("·")[0].trim();
+                if (zhShort && zhShort.length >= 1) vs.add(zhShort);
+              }
+            }
+          } catch (_) {}
+          return [...vs].filter(Boolean);
+        };
+        const variants = genVariants(q);
         const all = [];
         const seen = new Set();
-        for (let page = 1; page <= 12 && all.length < maxResults; page++) {
-          const recs = await gbApi.searchGameBananaMods(gameId, q, perpage, page);
-          const mods = (recs || []).filter((r) => r && r.id);
-          if (!mods.length) break;
-          for (const m of mods) {
-            if (seen.has(m.id)) continue;
-            seen.add(m.id);
-            all.push(m);
+        for (const vq of variants) {
+          for (let page = 1; page <= 12 && all.length < maxResults; page++) {
+            const recs = await gbApi.searchGameBananaMods(gameId, vq, perpage, page);
+            const mods = (recs || []).filter((r) => r && r.id);
+            if (!mods.length) break;
+            for (const m of mods) {
+              if (seen.has(m.id)) continue;
+              seen.add(m.id);
+              all.push(m);
+            }
+            if (mods.length < 10) break;
           }
-          if (mods.length < 10) break;
         }
         const results = all.slice(0, maxResults).map((r) => ({
           modId: r.id, name: r.name, author: r.author || "",
@@ -342,7 +372,7 @@ const server = http.createServer(async (req, res) => {
             });
           }
         }
-        return sendJson(res, 200, { ok: true, count: results.length, results, pages: all.length >= maxResults, normalized: q !== origQ ? { from: origQ, to: q } : undefined });
+        return sendJson(res, 200, { ok: true, count: results.length, results, pages: all.length >= maxResults, normalized: q !== origQ ? { from: origQ, to: q } : undefined, variants: variants.length > 1 ? variants : undefined });
       } catch (e) {
         return sendJson(res, 400, { ok: false, error: e.message || String(e) });
       }

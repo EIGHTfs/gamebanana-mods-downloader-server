@@ -303,7 +303,7 @@ function bindKeywordSearch() {
         if (!r.ok) throw new Error(r.error || "获取失败");
         kwRoleChars = r.characters || [];
         roleInput.placeholder = "输入过滤，如 Od → Odette";
-        if (st) { st.textContent = `已加载 ${kwRoleChars.length} 个角色（选角色后自动搜索）`; st.className = "status ok"; }
+        if (st) { st.textContent = `已加载 ${kwRoleChars.length} 个角色${r.fromCache ? "（缓存）" : ""}（选角色后自动搜索；设置页可手动刷新）`; st.className = "status ok"; }
         return;
       } catch (e) {
         if (attempt === 0) { if (st) { st.textContent = "获取角色列表失败，重试…"; st.className = "status"; } await new Promise((r2) => setTimeout(r2, 1200)); }
@@ -1115,18 +1115,24 @@ function bindMerge() {
     en.disabled = false; zh.disabled = false; // 选了仓库才能选角色/填中文
     loadGbCharacters();
   });
-  // 选仓库（角色等）→ 从香蕉网获取角色列表填入英文名下拉
-  async function loadGbCharacters() {
+  // 选仓库（角色等）→ 获取角色列表填入英文名下拉（2026-08-27：默认读 JSON 缓存，force=true 强制重新获取）
+  async function loadGbCharacters(force) {
     const game = $("#mmAddGame").value;
     const st = $("#mmAddStatus");
     if (!game) return;
-    if (st) { st.textContent = "从香蕉网获取角色列表…"; st.className = "status"; }
+    if (st) { st.textContent = force ? "从香蕉网重新获取角色列表…" : "加载角色列表…"; st.className = "status"; }
+    const qs = "/api/gb-characters?game=" + encodeURIComponent(game) + (force ? "&refresh=1" : "");
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const r = await api("/api/gb-characters?game=" + encodeURIComponent(game));
+        const r = await api(qs);
         if (!r.ok) throw new Error(r.error || "获取失败");
         window.__gbChars = r.characters || [];
-        if (st) { st.textContent = `已从香蕉网获取 ${window.__gbChars.length} 个角色（英文名输入时过滤选择，如 Od → Odette）`; st.className = "status ok"; }
+        if (st) {
+          st.textContent = force
+            ? `已重新获取并保存 ${window.__gbChars.length} 个角色（json/role-cache.json）`
+            : `已加载 ${window.__gbChars.length} 个角色${r.fromCache ? "（缓存）" : "（新获取）"}（英文名输入时过滤选择，如 Od → Odette）`;
+          st.className = "status ok";
+        }
         return;
       } catch (e) {
         if (attempt === 0) { if (st) { st.textContent = "网络抖动，重试…"; st.className = "status"; } await new Promise((r2) => setTimeout(r2, 1200)); }
@@ -1134,6 +1140,11 @@ function bindMerge() {
       }
     }
   }
+  // 2026-08-27 用户要求：设置页「重新获取角色」按钮——强制从香蕉网拉取并保存 JSON
+  $("#mmRefreshChars").addEventListener("click", () => {
+    if (!$("#mmAddGame").value) { const st = $("#mmAddStatus"); if (st) { st.textContent = "请先选择游戏"; st.className = "status err"; } return; }
+    loadGbCharacters(true);
+  });
   // 可搜索角色下拉（自绘，最多显示 20 条，输入过滤）
   function renderCombo(filter) {
     const list = window.__gbChars || [];

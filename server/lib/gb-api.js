@@ -338,12 +338,38 @@ async function fetchRoleCatIds(gameId) {
 const charCache = new Map(); // gameId -> { at, chars: [string] }
 const CHAR_PAGE_CAP = 10; // 最多翻 10 页（500 个最新 mod，足够覆盖近期活跃角色）
 const CHAR_CACHE_MS = 10 * 60 * 1000;
+// 2026-08-27 用户要求：角色列表持久化到 json/role-cache.json——搜索页/设置页复用，
+//   默认读 JSON（不用每次翻 GB 页），设置页按钮手动刷新（forceRefresh）。
+const CHAR_CACHE_FILE = path.join(__dirname, "..", "..", "json", "role-cache.json");
 
-async function fetchGameCharacterList(gameId, gameName) {
+function loadRoleCache() {
+  try { return JSON.parse(require("fs").readFileSync(CHAR_CACHE_FILE, "utf8")); } catch (_) { return {}; }
+}
+function saveRoleCache(obj) {
+  try { require("fs").mkdirSync(path.dirname(CHAR_CACHE_FILE), { recursive: true }); require("fs").writeFileSync(CHAR_CACHE_FILE, JSON.stringify(obj, null, 2)); } catch (_) {}
+}
+
+async function fetchGameCharacterList(gameId, gameName, forceRefresh) {
   if (!gameId) return [];
   const now = Date.now();
-  const hit = charCache.get(String(gameId));
-  if (hit && now - hit.at < CHAR_CACHE_MS) return hit.chars;
+  const gameKey = String(gameId);
+  // 1) JSON 持久化缓存（默认）：有且未强制刷新 → 直接返回（含本地 mapping 补全）
+  const jsonCache = loadRoleCache();
+  const jc = jsonCache[gameKey];
+  if (!forceRefresh && jc && Array.isArray(jc.characters) && jc.characters.length) {
+    // 合并本地 mapping roles（可能后续手动加过角色）
+    const merged = new Set(jc.characters);
+    try {
+      const map = cfg.readGameMapping(gameName);
+      for (const en of Object.keys((map && map.roles) || {})) if (en && en.trim().length >= 2) merged.add(en.trim());
+    } catch (_) {}
+    const list = [...merged].sort((a, b) => a.localeCompare(b, "en"));
+    charCache.set(gameKey, { at: now, chars: list });
+    return list;
+  }
+  // 2) 内存缓存（10 分钟）——避免短时间重复翻页
+  const hit = charCache.get(gameKey);
+  if (!forceRefresh && hit && now - hit.at < CHAR_CACHE_MS) return hit.chars;
   const chars = new Set();
   // GB 侧：最新 mod 的角色/子类名（Skins/Characters 大仓库下的子类 = 角色）
   for (let page = 1; page <= CHAR_PAGE_CAP; page++) {
@@ -371,7 +397,10 @@ async function fetchGameCharacterList(gameId, gameName) {
     }
   } catch (_) {}
   const list = [...chars].sort((a, b) => a.localeCompare(b, "en"));
-  charCache.set(String(gameId), { at: now, chars: list });
+  charCache.set(gameKey, { at: now, chars: list });
+  // 3) 写回 JSON 持久化
+  jsonCache[gameKey] = { characters: list, at: now };
+  saveRoleCache(jsonCache);
   return list;
 }
 

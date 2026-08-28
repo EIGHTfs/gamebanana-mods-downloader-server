@@ -197,6 +197,7 @@ try {
         </div>
         <label>中文名 <input type="text" id="mmAddZh" placeholder="奥黛塔" style="width:110px" disabled></label>
         <button class="primary" id="mmAddBtn" type="button">添加映射</button>
+        <button class="ghost" id="mmRefreshChars" type="button" title="从香蕉网重新获取角色列表并保存到 json/role-cache.json（搜索页选角色也用它）">🔄 重新获取角色</button>
         <span class="status" id="mmAddStatus"></span>
       </div>
     </div>
@@ -250,7 +251,7 @@ try {
   </div>
 </div>
 
-<script src="app.js?v=20260827-roleselect"></script>
+<script src="app.js?v=20260827-rolecache"></script>
 
 <!-- 目录选择弹窗（设置页「读取本地选择」下载路径） -->
 <div class="modal-mask" id="browseMask" style="display:none">

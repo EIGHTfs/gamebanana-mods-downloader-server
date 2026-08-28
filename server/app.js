@@ -233,9 +233,11 @@ const server = http.createServer(async (req, res) => {
       if (!game) return sendJson(res, 400, { ok: false, error: "missing game" });
       const gameId = cfg.gameIdOf(game);
       if (!gameId) return sendJson(res, 400, { ok: false, error: "unknown game: " + game });
+      // 2026-08-27：角色列表持久化 JSON——默认读缓存，refresh=1 强制重新从香蕉网获取
+      const forceRefresh = parsed.query.refresh === "1" || parsed.query.refresh === "true";
       try {
-        const characters = await gbApi.fetchGameCharacterList(gameId, game);
-        return sendJson(res, 200, { ok: true, count: characters.length, characters });
+        const characters = await gbApi.fetchGameCharacterList(gameId, game, forceRefresh);
+        return sendJson(res, 200, { ok: true, count: characters.length, characters, fromCache: !forceRefresh });
       } catch (e) {
         return sendJson(res, 400, { ok: false, error: e.message || String(e) });
       }

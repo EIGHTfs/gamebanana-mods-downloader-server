@@ -147,7 +147,10 @@ function organizeDir(modDir, trashDir, modId, relDir) {
       if (im.gbFile) known.add(String(im.gbFile).toLowerCase());
     }
   }
-  for (const g of obj.gifs || []) if (g && g.file) known.add(String(g.file).toLowerCase());
+  for (const g of obj.gifs || []) {
+    if (g && g.file) known.add(String(g.file).toLowerCase());
+    if (g && g.localFile) known.add(String(g.localFile).toLowerCase()); // 2026-08-30 本地名（URL 前缀）
+  }
 
   let ents = [];
   try { ents = fs.readdirSync(modDir, { withFileTypes: true }); } catch (_) { return { moved: [], kept: [], error: "读取目录失败" }; }

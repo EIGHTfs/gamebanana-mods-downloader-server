@@ -83,6 +83,23 @@ function fmtSize(bytes) {
   return n.toFixed(1) + " " + units[i];
 }
 
+// 2026-08-30（用户要求）：本地 gif 文件名 = 下载地址派生前缀 + GB 原始名，
+//   避免同一 mod 内不同 URL 的 gif 原始文件名相同（如 postimg anigif.gif）互相覆盖。
+//   前缀优先取 URL 路径的最后一级目录段（可读，postimg 每图一目录），否则 URL md5 前 8 位。
+function localGifName(url, file) {
+  let prefix = "";
+  if (url) {
+    try {
+      const u = new URL(url);
+      const segs = u.pathname.split("/").filter(Boolean);
+      const dir = segs.length > 1 ? segs[segs.length - 2] : "";
+      if (dir && !/[/\\:*?"<>|]/.test(dir) && dir.length <= 40) prefix = dir;
+    } catch (_) {}
+    if (!prefix) prefix = crypto.createHash("md5").update(String(url)).digest("hex").slice(0, 8);
+  }
+  return prefix ? prefix + "_" + file : file;
+}
+
 function fmtDate(ts) {
   if (!ts) return "-";
   const d = new Date(ts * 1000);
@@ -137,7 +154,7 @@ function buildHtmlContent(obj) {
   if (obj.gifs && obj.gifs.length) {
     obj.gifs.forEach((g, i) => {
       // 2026-08-26：gif 按 GB 原名（g.file），描述外链替换为本地 GB 原名文件
-      const localName = g.file || `gif_${String(i + 1).padStart(3, "0")}.gif`;
+      const localName = g.localFile || g.file || `gif_${String(i + 1).padStart(3, "0")}.gif`;
       if (g.url) descText = String(descText).split(g.url).join(localName);
     });
   }
@@ -256,7 +273,11 @@ async function genIndexHtml(url) {
     gifs: (mod.gifs || []).map((g, i) => {
       const raw = String((g && g.file) || "").trim();
       const safe = raw && !/[/\\:*?"<>|]/.test(raw) ? raw : `gif_${String(i + 1).padStart(3, "0")}.gif`;
-      return { file: safe, url: (g && g.url) || "" };
+      // 2026-08-30 修复（用户报告：同一 mod 内不同 URL 的 gif 文件名可能相同，如 postimg 的
+      //   anigif.gif，直接用原始名落盘会互相覆盖）——本地 gif 名 = URL 派生前缀 + 原名，
+      //   保证同 mod 内唯一；HTML 仍记录原始文件名 file 与原始下载地址 url。
+      const localFile = localGifName((g && g.url) || "", safe);
+      return { file: safe, localFile, url: (g && g.url) || "" };
     }),
     history: []
   };
@@ -500,8 +521,8 @@ function buildDownloadItems(mod, finalDir, obj) {
     items.push({
       type: unreachable ? "skipped" : "image", // gif 走图片下载逻辑
       url: g.url,
-      path: path.join(finalDir, g.file),
-      displayName: g.file,
+      path: path.join(finalDir, g.localFile || g.file),
+      displayName: g.localFile || g.file,
       targetDir: finalDir,
       isGif: true,
       skipReason: unreachable ? "gif 源图床不可达（tumblr/tenor/patreon），已跳过" : undefined,
@@ -740,7 +761,7 @@ async function prepareMod(url) {
         const lower = String(base).toLowerCase();
         const inFiles = (diskObj.files || []).some((x) => x && String(x.file).toLowerCase() === lower);
         const inImgs = (diskObj.images || []).some((x) => x && (String(x.file || "").toLowerCase() === lower || String(x.gbFile || "").toLowerCase() === lower));
-        const inGifs = (diskObj.gifs || []).some((x) => x && String(x.file || "").toLowerCase() === lower);
+        const inGifs = (diskObj.gifs || []).some((x) => x && (String(x.file || "").toLowerCase() === lower || String(x.localFile || "").toLowerCase() === lower));
         if (!inFiles && !inImgs && !inGifs) {
           let st = null;
           try { st = fs.statSync(path.join(finalDir, base)); } catch (_) {}

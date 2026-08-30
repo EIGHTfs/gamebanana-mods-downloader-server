@@ -91,9 +91,16 @@ function mergeTree(src, dst) {
       } else {
         if (fs.existsSync(d)) {
           // 2026-08-26 修复（实测合并不干净）：同名 description.html → 源壳删除（HTML 本就该
-          //   以目标/最新为准，重复壳留下会导致英文目录永远清不空）；其他同名文件 → 保留目标不覆盖
+          //   以目标/最新为准，重复壳留下会导致英文目录永远清不空）
+          // 2026-08-30 修复（实测：纯英文目录与规范目录同名子目录文件完全重复时，跳过文件留在
+          //   源目录 → 源目录清不空 → 不进垃圾桶残留）——同名文件且大小一致 → 视为重复副本，
+          //   从源删除（目标已有同一份）；大小不同 → 可能是不同版本，保留目标不覆盖
           if (ent.name === "description.html") {
             try { fs.unlinkSync(s); } catch (_) {}
+          } else {
+            let same = false;
+            try { same = fs.statSync(s).size === fs.statSync(d).size; } catch (_) {}
+            if (same) { try { fs.unlinkSync(s); moved++; } catch (_) {} }
           }
           continue;
         }

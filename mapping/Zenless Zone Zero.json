@@ -36,7 +36,6 @@
     "Jane Doe": "简·杜",
     "Ju Fufu": "橘福福",
     "Koleda Belobog": "珂蕾妲·贝洛伯格",
-    "Komano Manato": "Komano Manato",
     "Lighter": "莱特",
     "Lucia Elowen": "卢西娅·艾洛温",
     "Luciana de Montefio": "卢西亚娜·德·蒙特菲奥",
@@ -71,7 +70,8 @@
     "Yixuan": "仪玄",
     "Yuzuha Ukinami": "浮波柚叶",
     "Zhao": "照",
-    "Zhu Yuan": "朱鸢"
+    "Zhu Yuan": "朱鸢",
+    "Komano Manato": "狛野真斗"
   },
   "variants": {
     "亚历山德丽娜·莎芭丝缇安": [
@@ -192,9 +192,6 @@
       "珂蕾妲",
       "Koleda",
       "Koleda Belobog"
-    ],
-    "Komano Manato": [
-      "Komano Manato"
     ],
     "莱特": [
       "莱特",
@@ -354,6 +351,10 @@
     "朱鸢": [
       "朱鸢",
       "Zhu Yuan"
+    ],
+    "狛野真斗": [
+      "狛野真斗",
+      "Komano Manato"
     ]
   }
 }

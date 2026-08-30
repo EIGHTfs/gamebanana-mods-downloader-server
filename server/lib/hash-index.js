@@ -20,6 +20,7 @@ const GB_FILE = path.join(JSON_DIR, "gb-hash-index.json");
 const LOCAL_FILE = path.join(JSON_DIR, "local-hash-index.json");
 const NAME_FILE = path.join(JSON_DIR, "html-name-index.json"); // HTML 反查：GB 原名(短名) -> mod
 const organize = require("./organize"); // 2026-08-26 下载时/rebuild 时自动整理
+const cfg = require("../config"); // 2026-08-30 autoOrganize 开关
 
 const INDEX_TAG_ID = "gbmd-index";
 
@@ -270,7 +271,7 @@ async function rebuild() {
               // 2026-08-26 用户要求：垃圾桶保留来源目录结构
               let relDir = "";
               try { relDir = path.relative(root, dir); } catch (_) {}
-              const org = organize.organizeDir(dir, path.join(root, ".trash"), gbMeta.modId, relDir);
+              const org = cfg.readConfig().autoOrganize ? organize.organizeDir(dir, path.join(root, ".trash"), gbMeta.modId, relDir) : { moved: [] };
               if (org.moved && org.moved.length) {
                 console.log("[rebuild-organize]", (dir.split("/Mods/")[1] || dir).slice(0, 50), "→ 移出", org.moved.length, "个外部文件");
               }

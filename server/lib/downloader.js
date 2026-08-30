@@ -923,8 +923,15 @@ function downloadToFile(item, settings, onProgress) {
         let received = resumeOffset;
         const total = contentLength + resumeOffset;
 
-        let stallLast = received; // 2026-08-30 修复：以网络接收量 received 判断停滞（原用 fs.statSync(tmp).size，慢网速时写盘缓冲延迟导致误报"停滞"）
-        let stallCount = 0;
+        // 2026-08-30 修复（双判据）：received 与磁盘 stat 任一增长即视为下载进行中——
+        //   ① 网络慢但 data 事件持续 → received 增长（避免原 stat 版写盘缓冲延迟误报）
+        //   ② 写盘背压导致 pipe pause res、data 事件停摆 → 磁盘 stat 仍在增长（避免纯 received 版误报）
+        //   两者都连续 15s 无变化才判定停滞；停止/暂停仍 1s 内响应
+        const STALL_TIMEOUT_MS = 15000;
+        let stallLastReceived = received;
+        let stallLastSize = 0;
+        try { stallLastSize = fs.statSync(tmp).size; } catch (_) {}
+        let stallLastChangeAt = Date.now();
         stallTimer = setInterval(() => {
           if (done) { clearInterval(stallTimer); return; }
           if (task && (task.abort || task.pause)) {
@@ -932,17 +939,17 @@ function downloadToFile(item, settings, onProgress) {
             try { req.destroy(new Error(task.abort ? "已停止" : "已暂停")); } catch (_) {}
             return;
           }
-          if (received === stallLast) {
-            stallCount++;
-            if (stallCount >= 2) {
-              clearInterval(stallTimer);
-              try { req.destroy(new Error("下载停滞（数据停止接收且未完成）")); } catch (_) {}
-            }
-          } else {
-            stallCount = 0;
-            stallLast = received;
+          let curSize = stallLastSize;
+          try { curSize = fs.statSync(tmp).size; } catch (_) {}
+          if (received !== stallLastReceived || curSize !== stallLastSize) {
+            stallLastReceived = received;
+            stallLastSize = curSize;
+            stallLastChangeAt = Date.now();
+          } else if (Date.now() - stallLastChangeAt >= STALL_TIMEOUT_MS) {
+            clearInterval(stallTimer);
+            try { req.destroy(new Error("下载停滞（网络与磁盘均无进展且未完成）")); } catch (_) {}
           }
-        }, 2000); // 2026-08-26 缩短到 2s：停止/暂停 2 秒内中断下载（原 20s 太慢），停滞检测仍 2 次×2s
+        }, 1000); // 1s 检查：停止/暂停 1s 内中断；停滞需连续 15s 无任何进展
 
         res.on("data", (chunk) => {
           received += chunk.length;

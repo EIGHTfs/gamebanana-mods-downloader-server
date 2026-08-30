@@ -12,140 +12,348 @@
     "other": "其他"
   },
   "roles": {
-    "Zhu Yuan": "朱鸢",
-    "Yidhari Murphy": "伊德海莉",
-    "Anby": "安比",
-    "Anby Alexandra": "安比·亚历克斯",
-    "Nicole": "妮可",
-    "Nicole Demara": "妮可·德玛拉",
-    "Lucy": "露西",
-    "Corin": "可琳",
-    "Ellen": "艾莲",
-    "Grace": "格莉丝",
-    "Koleda": "珂蕾妲",
-    "Nekomata": "猫又",
-    "Piper": "派派",
-    "Qingyi": "青衣",
-    "Rina": "丽娜",
-    "Soldier 11": "「11号」",
-    "Soukaku": "苍角",
-    "Billy Kid": "比利·奇德",
-    "Ben": "本",
-    "Ben Bigger": "本·比格",
-    "Anton": "安东",
-    "Anton Ivanov": "安东·伊万诺夫",
-    "Lycaon": "莱卡恩",
-    "Von Lycaon": "冯·莱卡恩",
-    "Caesar": "凯撒",
-    "Caesar King": "凯撒·金",
-    "Burnice": "柏妮思",
-    "Burnice White": "柏妮思·怀特",
-    "Jane Doe": "简·杜",
-    "Seth": "赛斯",
-    "Seth Lowell": "赛斯·洛威尔",
-    "Yanagi": "月城柳",
-    "Yanagi Tsukishiro": "月城柳",
-    "Lighter": "莱特",
-    "Harumasa": "浅羽悠真",
-    "Asaba Harumasa": "浅羽悠真",
-    "Miyabi": "星见雅",
-    "Hoshimi Miyabi": "星见雅",
-    "Evelyn": "伊芙琳",
-    "Evelyn Chevalier": "伊芙琳·雪瓦利耶",
-    "Astra Yao": "耀嘉音",
-    "Hugo": "雨果",
-    "Hugo Vlad": "雨果·弗拉德",
-    "Vivian": "薇薇安",
-    "Trigger": "扳机",
-    "Pulchra": "波可娜",
-    "Belle": "铃",
-    "Yixuan": "仪玄",
-    "Yuzuha": "浮波柚叶",
-    "Dialyn": "琉音",
-    "Lucia": "卢西娅",
-    "Orphie": "奥菲丝",
-    "Seed": "席德",
-    "Nekomiya": "猫宫又奈",
-    "Ju Fufu": "橘福福",
-    "Ye Shun Guang": "叶瞬光",
-    "Wise": "哲",
-    "Anby Demara": "安比·德玛拉",
-    "Soldier 0 Anby": "安比·零号特工",
-    "Nekomiya Mana": "猫又·玛娜",
-    "Ellen Joe": "艾莲·乔",
     "Alexandrina Sebastiane": "亚历山德丽娜·莎芭丝缇安",
     "Alice Thymefield": "爱丽丝·泰姆菲尔德",
-    "Grace Howard": "格莉丝·霍华德",
-    "Koleda Belobog": "珂蕾妲·贝洛伯格",
+    "Anby Demara": "安比·德玛拉",
+    "Anton Ivanov": "安东·伊万诺夫",
+    "Aria": "爱芮",
+    "Asaba Harumasa": "浅羽悠真",
+    "Astra Yao": "耀嘉音",
+    "Banyue": "般岳",
+    "Belle": "铃",
+    "Ben Bigger": "本·比格",
+    "Billy Kid": "比利·奇德",
+    "Burnice White": "柏妮思·怀特",
+    "Caesar King": "凯撒·金",
+    "Cissia": "希希芙",
     "Corin Wickes": "可琳·威克斯",
-    "Piper Wheel": "派派·韦尔",
+    "Dialyn": "琉音",
+    "Ellen Joe": "艾莲·乔",
+    "Evelyn Chevalier": "伊芙琳·雪瓦利耶",
+    "Grace Howard": "格莉丝·霍华德",
+    "Hoshimi Miyabi": "星见雅",
+    "Hugo Vlad": "雨果·弗拉德",
+    "Jane Doe": "简·杜",
+    "Ju Fufu": "橘福福",
+    "Koleda Belobog": "珂蕾妲·贝洛伯格",
+    "Komano Manato": "Komano Manato",
+    "Lighter": "莱特",
     "Lucia Elowen": "卢西娅·艾洛温",
-    "Nangong Yu": "南宫羽",
-    "Pulchra Fellini": "波可娜·费利尼",
-    "Promeia": "普罗米娅",
-    "Yuzuha Ukinami": "浮波柚叶",
-    "Remielle Dan": "雷米耶·丹",
     "Luciana de Montefio": "卢西亚娜·德·蒙特菲奥",
+    "Nangong Yu": "南宫羽",
+    "Nekomiya Mana": "猫又·玛娜",
+    "Nicole Demara": "妮可·德玛拉",
+    "Norma Hollowell": "诺姆·霍洛维尔",
+    "Orphie Magnusson": "奥菲丝·马格努森",
+    "Pan Yinhu": "潘引壶",
+    "Piper Wheel": "派派·韦尔",
+    "Promeia": "普罗米娅",
+    "Pulchra Fellini": "波可娜·费利尼",
+    "Pyrois": "佩洛伊斯",
+    "Qingyi": "青衣",
+    "Remielle Dan": "雷米耶·丹",
+    "Seed": "席德",
+    "Seth Lowell": "赛斯·洛威尔",
+    "Sigrid de L'Azur": "希格莉德·德拉叙尔",
+    "Soldier 0 Anby": "安比·零号特工",
+    "Soldier 11": "「11号」",
+    "Soukaku": "苍角",
+    "Starlight Billy": "星徽比利",
+    "Sunna": "千夏",
+    "Trigger": "扳机",
+    "Velina Airgid": "维琳娜",
+    "Vivian Banshee": "薇薇安·班茜",
+    "Von Lycaon": "冯·莱卡恩",
+    "Wise": "哲",
+    "Yanagi Tsukishiro": "月城柳",
     "Ye Shunguang": "叶瞬光",
-    "Eous": "伊奥斯",
-    "Vivian Banshee": "薇薇安·班茜"
+    "Yidhari Murphy": "伊德海莉",
+    "Yixuan": "仪玄",
+    "Yuzuha Ukinami": "浮波柚叶",
+    "Zhao": "照",
+    "Zhu Yuan": "朱鸢"
   },
   "variants": {
-    "朱鸢": "Zhu Yuan",
-    "伊德海莉": "Yidhari Murphy",
-    "安比": "Anby",
-    "妮可": "Nicole",
-    "露西": "Lucy",
-    "可琳": "Corin",
-    "艾莲": "Ellen",
-    "格莉丝": "Grace",
-    "珂蕾妲": "Koleda",
-    "猫又": "Nekomata",
-    "派派": "Piper",
-    "青衣": "Qingyi",
-    "丽娜": "Rina",
-    "「11号」": "Soldier 11",
-    "苍角": "Soukaku",
-    "安比·亚历克斯": "Anby Alexandra",
-    "妮可·德玛拉": "Nicole Demara",
-    "比利·奇德": "Billy Kid",
-    "本": "Ben",
-    "本·比格": "Ben Bigger",
-    "安东": "Anton",
-    "安东·伊万诺夫": "Anton Ivanov",
-    "莱卡恩": "Lycaon",
-    "冯·莱卡恩": "Von Lycaon",
-    "凯撒": "Caesar",
-    "凯撒·金": "Caesar King",
-    "柏妮思": "Burnice",
-    "柏妮思·怀特": "Burnice White",
-    "简·杜": "Jane Doe",
-    "赛斯": "Seth",
-    "赛斯·洛威尔": "Seth Lowell",
-    "柳": "Yanagi",
-    "月城柳": "Yanagi Tsukishiro",
-    "莱特": "Lighter",
-    "悠真": "Harumasa",
-    "浅羽悠真": "Asaba Harumasa",
-    "星见雅": "Miyabi",
-    "伊芙琳": "Evelyn",
-    "伊芙琳·雪瓦利耶": "Evelyn Chevalier",
-    "艾斯特拉·耀": "Astra Yao",
-    "雨果": "Hugo",
-    "雨果·弗拉德": "Hugo Vlad",
-    "薇薇安": "Vivian",
-    "扳机": "Trigger",
-    "波丽娜": "Pulchra",
-    "铃": "Belle",
-    "仪玄": "Yixuan",
-    "浮波柚叶": "Yuzuha",
-    "琉音": "Dialyn",
-    "卢西娅": "Lucia",
-    "奥菲丝": "Orphie",
-    "席德": "Seed",
-    "猫宫又奈": "Nekomiya",
-    "橘福福": "Ju Fufu",
-    "叶瞬光": "Ye Shun Guang",
-    "哲": "Wise"
+    "亚历山德丽娜·莎芭丝缇安": [
+      "亚历山德丽娜·莎芭丝缇安",
+      "Alexandrina Sebastiane"
+    ],
+    "爱丽丝·泰姆菲尔德": [
+      "爱丽丝·泰姆菲尔德",
+      "Alice Thymefield"
+    ],
+    "安比·德玛拉": [
+      "安比·德玛拉",
+      "Anby Demara"
+    ],
+    "安东·伊万诺夫": [
+      "安东·伊万诺夫",
+      "安东",
+      "Anton",
+      "Anton Ivanov"
+    ],
+    "爱芮": [
+      "爱芮",
+      "Aria"
+    ],
+    "浅羽悠真": [
+      "浅羽悠真",
+      "悠真",
+      "Asaba Harumasa",
+      "Harumasa"
+    ],
+    "耀嘉音": [
+      "耀嘉音",
+      "Astra Yao"
+    ],
+    "般岳": [
+      "般岳",
+      "Banyue"
+    ],
+    "铃": [
+      "铃",
+      "Belle"
+    ],
+    "本·比格": [
+      "本·比格",
+      "本",
+      "Ben",
+      "Ben Bigger"
+    ],
+    "比利·奇德": [
+      "比利·奇德",
+      "Billy Kid"
+    ],
+    "柏妮思·怀特": [
+      "柏妮思·怀特",
+      "柏妮思",
+      "Burnice",
+      "Burnice White"
+    ],
+    "凯撒·金": [
+      "凯撒·金",
+      "凯撒",
+      "Caesar",
+      "Caesar King"
+    ],
+    "希希芙": [
+      "希希芙",
+      "Cissia"
+    ],
+    "可琳·威克斯": [
+      "可琳·威克斯",
+      "可琳",
+      "Corin",
+      "Corin Wickes"
+    ],
+    "琉音": [
+      "琉音",
+      "Dialyn"
+    ],
+    "艾莲·乔": [
+      "艾莲·乔",
+      "艾莲",
+      "Ellen",
+      "Ellen Joe"
+    ],
+    "伊芙琳·雪瓦利耶": [
+      "伊芙琳·雪瓦利耶",
+      "伊芙琳",
+      "Evelyn",
+      "Evelyn Chevalier"
+    ],
+    "格莉丝·霍华德": [
+      "格莉丝·霍华德",
+      "格莉丝",
+      "Grace",
+      "Grace Howard"
+    ],
+    "星见雅": [
+      "星见雅",
+      "Hoshimi Miyabi",
+      "Miyabi"
+    ],
+    "雨果·弗拉德": [
+      "雨果·弗拉德",
+      "雨果",
+      "Hugo",
+      "Hugo Vlad"
+    ],
+    "简·杜": [
+      "简·杜",
+      "Jane Doe"
+    ],
+    "橘福福": [
+      "橘福福",
+      "Ju Fufu"
+    ],
+    "珂蕾妲·贝洛伯格": [
+      "珂蕾妲·贝洛伯格",
+      "珂蕾妲",
+      "Koleda",
+      "Koleda Belobog"
+    ],
+    "Komano Manato": [
+      "Komano Manato"
+    ],
+    "莱特": [
+      "莱特",
+      "Lighter"
+    ],
+    "卢西娅·艾洛温": [
+      "卢西娅·艾洛温",
+      "Lucia Elowen"
+    ],
+    "卢西亚娜·德·蒙特菲奥": [
+      "卢西亚娜·德·蒙特菲奥",
+      "Luciana de Montefio"
+    ],
+    "南宫羽": [
+      "南宫羽",
+      "Nangong Yu"
+    ],
+    "猫又·玛娜": [
+      "猫又·玛娜",
+      "猫宫又奈",
+      "Nekomiya",
+      "Nekomiya Mana"
+    ],
+    "妮可·德玛拉": [
+      "妮可·德玛拉",
+      "妮可",
+      "Nicole",
+      "Nicole Demara"
+    ],
+    "诺姆·霍洛维尔": [
+      "诺姆·霍洛维尔",
+      "Norma Hollowell"
+    ],
+    "奥菲丝·马格努森": [
+      "奥菲丝·马格努森",
+      "奥菲丝",
+      "Orphie",
+      "Orphie Magnusson"
+    ],
+    "潘引壶": [
+      "潘引壶",
+      "Pan Yinhu"
+    ],
+    "派派·韦尔": [
+      "派派·韦尔",
+      "派派",
+      "Piper",
+      "Piper Wheel"
+    ],
+    "普罗米娅": [
+      "普罗米娅",
+      "Promeia"
+    ],
+    "波可娜·费利尼": [
+      "波可娜·费利尼",
+      "波丽娜",
+      "Pulchra",
+      "Pulchra Fellini"
+    ],
+    "佩洛伊斯": [
+      "佩洛伊斯",
+      "Pyrois"
+    ],
+    "青衣": [
+      "青衣",
+      "Qingyi"
+    ],
+    "雷米耶·丹": [
+      "雷米耶·丹",
+      "Remielle Dan"
+    ],
+    "席德": [
+      "席德",
+      "Seed"
+    ],
+    "赛斯·洛威尔": [
+      "赛斯·洛威尔",
+      "赛斯",
+      "Seth",
+      "Seth Lowell"
+    ],
+    "希格莉德·德拉叙尔": [
+      "希格莉德·德拉叙尔",
+      "Sigrid de L'Azur"
+    ],
+    "安比·零号特工": [
+      "安比·零号特工",
+      "Soldier 0 Anby"
+    ],
+    "「11号」": [
+      "「11号」",
+      "Soldier 11"
+    ],
+    "苍角": [
+      "苍角",
+      "Soukaku"
+    ],
+    "星徽比利": [
+      "星徽比利",
+      "Starlight Billy"
+    ],
+    "千夏": [
+      "千夏",
+      "Sunna"
+    ],
+    "扳机": [
+      "扳机",
+      "Trigger"
+    ],
+    "维琳娜": [
+      "维琳娜",
+      "Velina Airgid"
+    ],
+    "薇薇安·班茜": [
+      "薇薇安·班茜",
+      "薇薇安",
+      "Vivian",
+      "Vivian Banshee"
+    ],
+    "冯·莱卡恩": [
+      "冯·莱卡恩",
+      "莱卡恩",
+      "Lycaon",
+      "Von Lycaon"
+    ],
+    "哲": [
+      "哲",
+      "Wise"
+    ],
+    "月城柳": [
+      "月城柳",
+      "柳",
+      "Yanagi",
+      "Yanagi Tsukishiro"
+    ],
+    "叶瞬光": [
+      "叶瞬光",
+      "Ye Shunguang"
+    ],
+    "伊德海莉": [
+      "伊德海莉",
+      "Yidhari Murphy"
+    ],
+    "仪玄": [
+      "仪玄",
+      "Yixuan"
+    ],
+    "浮波柚叶": [
+      "浮波柚叶",
+      "Yuzuha",
+      "Yuzuha Ukinami"
+    ],
+    "照": [
+      "照",
+      "Zhao"
+    ],
+    "朱鸢": [
+      "朱鸢",
+      "Zhu Yuan"
+    ]
   }
 }

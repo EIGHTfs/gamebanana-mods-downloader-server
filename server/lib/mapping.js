@@ -113,7 +113,9 @@ function itemDirName(category, game) {
   const en = String(category || "").trim();
   if (!en) return "";
   const gameMap = cfg.readGameMapping(game);
-  const roles = (gameMap && gameMap.roles) || {};
+  if (!gameMap) return en;
+  const roles = (gameMap.roles) || {};
+  const variants = (gameMap.variants) || {};
   const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");
   const enN = norm(en);
   let zh = roles[en] || "";
@@ -122,11 +124,29 @@ function itemDirName(category, game) {
       if (norm(k) === enN) { zh = v; break; }
     }
   }
+  if (!zh && variants) {
+    // 新规范：variants 数组含英文变体（Anton → 安东·伊万诺夫）
+    for (const [vk, vv] of Object.entries(variants)) {
+      const arr = Array.isArray(vv) ? vv : [vv];
+      if (arr.some((x) => String(x).toLowerCase() === enN || norm(x) === enN)) { zh = vk; break; }
+    }
+  }
   if (zh && zh !== en) {
-    // 用映射 key 的规范英文拼目录（大小写差异对齐：yanqing → YanQing）
+    // 用映射 key 的规范英文拼目录（大小写差异对齐：yanqing → YanQing；变体 Anton → 规范 Anton Ivanov）
     let canonEn = en;
     for (const [k, v] of Object.entries(roles)) {
-      if (String(v) === zh && norm(k) === norm(en)) { canonEn = k; break; }
+      if (String(v) === zh && (norm(k) === norm(en) || norm(k) === enN)) { canonEn = k; break; }
+    }
+    if (canonEn === en && variants) {
+      for (const [vk, vv] of Object.entries(variants)) {
+        const arr = Array.isArray(vv) ? vv : [vv];
+        if (vk === zh && arr.some((x) => norm(x) === enN)) {
+          for (const [k, v] of Object.entries(roles)) {
+            if (String(v) === zh) { canonEn = k; break; }
+          }
+          break;
+        }
+      }
     }
     return `${canonEn} – ${zh}`;
   }
@@ -138,12 +158,21 @@ function roleZhOf(name, game) {
   const en = String(name || "").trim();
   if (!en) return "";
   const gameMap = cfg.readGameMapping(game);
-  const roles = (gameMap && gameMap.roles) || {};
+  if (!gameMap) return "";
+  const roles = (gameMap.roles) || {};
+  const variants = (gameMap.variants) || {};
   const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");
   const enN = norm(en);
   if (roles[en]) return roles[en];
   for (const [k, v] of Object.entries(roles)) {
     if (norm(k) === enN) return v;
+  }
+  // 新规范：variants 数组含英文变体（Anton → 安东·伊万诺夫）
+  if (variants) {
+    for (const [vk, vv] of Object.entries(variants)) {
+      const arr = Array.isArray(vv) ? vv : [vv];
+      if (arr.some((x) => String(x).toLowerCase() === enN || norm(x) === enN)) return vk;
+    }
   }
   return "";
 }

@@ -28,7 +28,9 @@ const DEFAULT_CONFIG = {
   // 2026-08-27 找回模式：开启后不实际下载，只归位/找回/生成 HTML
   restoreOnly: false,
   // GB 登录检测用 NSFW mod（hide 可见性，未登录拉不到文件列表）
-  gbCheckModId: 708465
+  gbCheckModId: 708465,
+  // 2026-08-30 用户要求：自动整理（organizeDir 移出外部文件）默认禁用
+  autoOrganize: false
 };
 
 function readConfig() {
@@ -203,7 +205,17 @@ function addRoleMapping(game, en, zh) {
   map.roles = map.roles || {};
   map.variants = map.variants || {};
   map.roles[en] = zh;
-  if (zh !== en) map.variants[zh] = en;
+  if (zh !== en) {
+    if (Array.isArray(map.variants[zh])) {
+      // 新规范：variants 是数组（含规范中文 + 变体），追加不覆盖
+      const arr = map.variants[zh];
+      if (!arr.includes(zh)) arr.unshift(zh);
+      if (!arr.includes(en)) arr.push(en);
+    } else {
+      // 旧规范：字符串（其他游戏仍是）
+      map.variants[zh] = en;
+    }
+  }
   fs.writeFileSync(file, JSON.stringify(map, null, 2), "utf8");
   return { ok: true, game, en, zh };
 }

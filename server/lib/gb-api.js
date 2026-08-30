@@ -186,12 +186,40 @@ function normalizeKeyword(game, kw) {
     if (!map) return k;
     const roles = (map.roles || {});
     const variants = (map.variants || {});
-    // 1) variants：key 精确命中 → 规范英文
-    if (variants[k]) return String(variants[k]);
-    for (const [vk, vv] of Object.entries(variants)) {
-      if (String(vv) === k) return k; // 传入已是规范英文，保持原词
+    // 取 variants 项为数组：新规范已是数组；旧规范字符串 → [字符串]
+    const arrOf = (v) => (Array.isArray(v) ? v : [v]);
+    const isZh = (s) => /[\u4e00-\u9fff]/.test(String(s || ""));
+    // 规范中文 → 规范英文（roles 反查）
+    const canonEnOf = (zh) => {
+      for (const [en, zhv] of Object.entries(roles)) if (String(zhv) === zh) return en;
+      return "";
+    };
+    // 1) variants：key 精确命中
+    if (variants[k]) {
+      const arr = arrOf(variants[k]);
+      if (arr.length === 1 && !isZh(arr[0]) && isZh(k)) {
+        // 旧规范：{ 中文: "英文" } → 直接取英文
+        return String(arr[0]);
+      }
+      // 新规范：{ 规范中文: [中文简写..., 英文变体...] } → 返回规范英文
+      const ce = canonEnOf(k);
+      if (ce) return ce;
+      const enHit = arr.find((x) => !isZh(x));
+      if (enHit) return enHit;
+      return k;
     }
-    // 2) roles 反向：中文 → 英文
+    // 2) k 是某角色的变体（新规范数组内 或 旧规范值）
+    for (const [vk, vv] of Object.entries(variants)) {
+      const arr = arrOf(vv);
+      if (arr.includes(k) || arr.some((x) => String(x).toLowerCase() === String(k).toLowerCase())) {
+        if (!isZh(vk)) return vk; // 旧规范值命中：vk=英文 → 已是规范英文
+        const ce = canonEnOf(vk);
+        if (ce) return ce;
+        const enHit = arr.find((x) => !isZh(x));
+        return enHit || vk;
+      }
+    }
+    // 3) roles 反向：中文 → 英文
     for (const [en, zh] of Object.entries(roles)) {
       if (String(zh) === k) return en;
     }
@@ -387,24 +415,26 @@ async function fetchGameCharacterList(gameId, gameName, forceRefresh) {
   const hit = charCache.get(gameKey);
   if (!forceRefresh && hit && now - hit.at < CHAR_CACHE_MS) return hit.chars;
   const chars = new Set();
-  // GB 侧：最新 mod 的角色/子类名（Skins/Characters 大仓库下的子类 = 角色）
-  for (let page = 1; page <= CHAR_PAGE_CAP; page++) {
-    try {
-      const url =
-        `${API_BASE}/Index?_nPage=${page}&_nPerpage=50` +
-        `&_aFilters%5BGeneric_Game%5D=${gameId}&_sSort=Generic_NewAndUpdated`;
-      const data = await fetchJson(url, {}, 1);
-      for (const rec of data._aRecords || []) {
-        const root = (rec._aRootCategory && rec._aRootCategory._sName) || "";
-        const sub = (rec._aSubCategory && rec._aSubCategory._sName) || "";
-        if (!sub || !/^(Characters|Skins)$/i.test(String(root).trim())) continue; // 角色性大仓库下的子类
-        const clean = sub.trim();
-        if (clean && clean.length >= 2 && !/^(characters|skins|weapons)$/i.test(clean)) chars.add(clean);
-      }
-      if ((data._aRecords || []).length < 50) break;
-    } catch (_) { break; }
-    await new Promise((r) => setTimeout(r, 350));
-  }
+  // 2026-08-30 修复（用户指出：获取角色原名不准——旧实现翻最新 mod 的 _aSubCategory，
+  //   会把简写/非官方名混入，如 "Anton" 与 "Anton Ivanov" 并存）：
+  //   改用香蕉网官方接口 Mod/Categories——直接拉角色性根分类（Character Skins/Bangboo Skins
+  //   等）的官方子分类列表（_sName 即官方角色原名，如 "Anton Ivanov"），A-Z 全量、含空分类。
+  try {
+    const info = await fetchGameInfo(gameId);
+    const roleRoots = ((info && info.roots) || []).filter((r) => /character|skin/i.test(r.name || ""));
+    for (const root of roleRoots) {
+      try {
+        const url = `${API_BASE}/Categories?_idCategoryRow=${root.id}&_sSort=a_to_z&_bShowEmpty=true`;
+        const data = await fetchJson(url, {}, 2);
+        const cats = (data && data._aRecords) || (Array.isArray(data) ? data : []);
+        for (const c of cats || []) {
+          const clean = String((c && c._sName) || "").trim();
+          if (clean && clean.length >= 2 && !/^(characters|skins|weapons)$/i.test(clean)) chars.add(clean);
+        }
+      } catch (_) {}
+      await new Promise((r) => setTimeout(r, 350));
+    }
+  } catch (_) {}
   // 本地 mapping roles 英文 key 补全
   try {
     const map = cfg.readGameMapping(gameName);

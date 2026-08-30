@@ -1107,6 +1107,16 @@ async function doDownloadLoop() {
         const myIdx = task.buildIndex;
         task.buildIndex++;
         const modRef = task.pendingMods[myIdx];
+        // 2026-08-30 用户要求：准备阶段去重——该 mod 已在下载列表（排队中/已成功/已跳过）→
+        //   不再准备，直接记录去重跳过项（items 计数保持，结果标记 skip 原因）
+        if (modInTask(modRef.profileUrl, myIdx)) {
+          task.items = task.items || [];
+          task.items.push({ type: "skipped", displayName: modRef.name || modRef.profileUrl, modName: modRef.name, modUrl: modRef.profileUrl, path: "", url: modRef.profileUrl, skipReason: "已在下载列表（去重跳过）" });
+          task.preparingItem = null;
+          task.updatedAt = Date.now();
+          saveTask();
+          continue;
+        }
         task.preparingItem = { name: modRef.name || modRef.profileUrl, type: "preparing" };
         task.message = `准备 ${myIdx + 1}/${(task.pendingMods || []).length} · 已完成 ${resultsByIndex.size} 项`;
         saveTask();
@@ -1339,16 +1349,55 @@ async function finalizeHtmls() {
 }
 
 // ---------- 对外控制 ----------
+// 2026-08-30 用户要求（简化）：去重不看状态——只要重复的 modId 就跳过。
+// 判定范围：task.pendingMods（排队/已处理）与 task.items（构建过，含成功/失败/跳过/error）中出现过同 modId → 跳过。
+function modInTask(url, excludePendingIdx) {
+  if (!task) return false;
+  const id = (() => { try { return String(gbApi.extractModId(url) || "").trim(); } catch (_) { return ""; } })();
+  if (!id) return false;
+  const pend = task.pendingMods || [];
+  for (let i = 0; i < pend.length; i++) {
+    if (i === excludePendingIdx) continue;
+    const m = pend[i];
+    let mid = "";
+    try { mid = String(gbApi.extractModId((m && (m.profileUrl || m.url)) || "") || "").trim(); } catch (_) {}
+    if (mid === id) return true;
+  }
+  const its = task.items || [];
+  for (let i = 0; i < its.length; i++) {
+    const it = its[i];
+    if (!it) continue;
+    let itid = "";
+    try { itid = String(gbApi.extractModId((it.modUrl || it.url) || "") || "").trim(); } catch (_) {}
+    if (itid === id) return true;
+  }
+  return false;
+}
+
 async function startDownloadTask({ mods }) {
-  const urls = (mods || [])
+  let urls = (mods || [])
     .map((m) => String((m && (m.profileUrl || m.url || m)) || "").trim())
     .filter((u) => u && gbApi.extractModId(u));
   if (!urls.length) throw new Error("没有有效的 mod 链接");
 
   if (task && (task.status === "running" || task.status === "preparing" || task.status === "paused")) {
     task.pendingMods = task.pendingMods || [];
+    // 2026-08-30 用户要求（简化）：去重不看状态——本批内重复 modId 只留一个；已在下载列表（重复 modId）跳过
+    {
+      const seen = new Set();
+      urls = urls.filter((u) => {
+        const uid = (() => { try { return String(gbApi.extractModId(u) || "").trim(); } catch (_) { return ""; } })();
+        if (!uid) return true;
+        if (seen.has(uid)) return false;
+        seen.add(uid);
+        return true;
+      });
+    }
+    const before = urls.length;
+    urls = urls.filter((u) => !modInTask(u));
+    const skipped = before - urls.length;
     task.pendingMods.push(...urls.map((u) => ({ profileUrl: u, name: u })));
-    task.message = `已追加 ${urls.length} 个 mod 到下载队列`;
+    task.message = `已追加 ${urls.length} 个 mod 到下载队列` + (skipped > 0 ? `（跳过 ${skipped} 个已在下载列表）` : "");
     task.updatedAt = Date.now();
     saveTask();
     // 2026-08-26 修复（用户反馈：paused 时提交显示「追加中」不下载）：
@@ -1359,7 +1408,7 @@ async function startDownloadTask({ mods }) {
       task.status = "running";
       task.pause = false;
       task.abort = false;
-      task.message = `已恢复下载（追加 ${urls.length} 个 mod）`;
+      task.message = `已恢复下载（追加 ${urls.length} 个 mod）` + (typeof skipped !== "undefined" && skipped > 0 ? `（跳过 ${skipped} 个已在下载列表）` : "");
       task.updatedAt = Date.now();
       saveTask();
       runDownloadLoop();

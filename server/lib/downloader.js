@@ -100,6 +100,37 @@ function localGifName(url, file) {
   return prefix ? prefix + "_" + file : file;
 }
 
+// 2026-08-30 用户要求：gif 下载前先 HEAD 获取文件大小（Content-Length），
+//   本地名 = 原名_大小MB(≥2位小数)（同名不同 URL 不覆盖）。失败返回 0（调用方兜底）
+function httpHeadContentLength(url, timeoutMs) {
+  return new Promise((resolve) => {
+    let u;
+    try { u = new URL(url); } catch (_) { return resolve(0); }
+    const mod = u.protocol === "https:" ? https : http;
+    const req = mod.request(u, {
+      method: "HEAD",
+      timeout: timeoutMs || 12000,
+      agent: u.protocol === "https:" ? HTTPS_AGENT : HTTP_AGENT
+    }, (res) => {
+      const len = parseInt(res.headers["content-length"] || "0", 10);
+      res.resume();
+      resolve(isFinite(len) && len > 0 ? len : 0);
+    });
+    req.on("timeout", () => { try { req.destroy(); } catch (_) {} resolve(0); });
+    req.on("error", () => resolve(0));
+    req.end();
+  });
+}
+
+// 2026-08-30 用户要求：一个 part 文件只需要一个线程修改（避免同名文件并发写互相覆盖）
+const partLocks = new Map(); // partPath -> Promise（前序任务完成信号）
+function withPartLock(partPath, fn) {
+  const prev = partLocks.get(partPath) || Promise.resolve();
+  const cur = prev.then(() => fn());
+  partLocks.set(partPath, cur.catch(() => {})); // 存吞错后的完成信号，供下一个等待
+  return cur;
+}
+
 function fmtDate(ts) {
   if (!ts) return "-";
   const d = new Date(ts * 1000);
@@ -238,9 +269,10 @@ async function genIndexHtml(url) {
     files: (() => {
       const merged = [];
       const seen = new Set();
-      // ① 旧 HTML 记录（本地历史遗留，含网上已下架的）——保留
+      // ① 旧 HTML 记录——2026-08-30 用户要求：只保留「有下载地址记录」的旧文件（url 非空），
+      //   追加进新 HTML；纯本地已失去记录的旧文件不记录（文件不移动不删除）
       for (const oldF of (existing && existing.files) || []) {
-        if (!oldF || !oldF.file) continue;
+        if (!oldF || !oldF.file || !oldF.url) continue;
         const key = String(oldF.file).toLowerCase();
         if (seen.has(key)) continue;
         seen.add(key);
@@ -270,15 +302,22 @@ async function genIndexHtml(url) {
     //   提取到 g.file（如 dlni606-ad685320.gif），不再强制改成 gif_XXX.gif 序列名——
     //   序列名是通用名（任何 mod 都有 gif_001.gif），会破坏按原名跳过/找回，也是 step2 误移帮凶。
     //   仅当 GB 原名缺失/非法时才回退序列名。
-    gifs: (mod.gifs || []).map((g, i) => {
-      const raw = String((g && g.file) || "").trim();
-      const safe = raw && !/[/\\:*?"<>|]/.test(raw) ? raw : `gif_${String(i + 1).padStart(3, "0")}.gif`;
-      // 2026-08-30 修复（用户报告：同一 mod 内不同 URL 的 gif 文件名可能相同，如 postimg 的
-      //   anigif.gif，直接用原始名落盘会互相覆盖）——本地 gif 名 = URL 派生前缀 + 原名，
-      //   保证同 mod 内唯一；HTML 仍记录原始文件名 file 与原始下载地址 url。
-      const localFile = localGifName((g && g.url) || "", safe);
-      return { file: safe, localFile, url: (g && g.url) || "" };
-    }),
+    gifs: await (async () => {
+      // 2026-08-30 用户要求：所有 gif 都 HEAD 获取大小，本地名 = 原名_大小MB(≥2位小数)，
+      //   同 mod 内唯一（同名不同 URL 不覆盖）；HTML 仍记录原始文件名 file 与原始下载地址 url。
+      const out = [];
+      for (const g of (mod.gifs || [])) {
+        const raw = String((g && g.file) || "").trim();
+        const safe = raw && !/[/\\:*?"<>|]/.test(raw) ? raw : `gif_${out.length + 1}` + ".gif";
+        const url = (g && g.url) || "";
+        const size = await httpHeadContentLength(url);
+        const ext = path.extname(safe) || ".gif";
+        const base = safe.slice(0, -ext.length) || "gif";
+        const localFile = size > 0 ? `${base}_${(size / 1048576).toFixed(2)}MB${ext}` : localGifName(url, safe);
+        out.push({ file: safe, localFile, url, size });
+      }
+      return out;
+    })(),
     history: []
   };
   return { mod, target, obj };
@@ -523,6 +562,7 @@ function buildDownloadItems(mod, finalDir, obj) {
       url: g.url,
       path: path.join(finalDir, g.localFile || g.file),
       displayName: g.localFile || g.file,
+      size: (g && g.size) || 0,
       targetDir: finalDir,
       isGif: true,
       skipReason: unreachable ? "gif 源图床不可达（tumblr/tenor/patreon），已跳过" : undefined,
@@ -786,10 +826,27 @@ async function prepareMod(url) {
   } catch (_) {}
 
   // ---- 第四步：构建下载项（标记已存在）----
+  // 2026-08-30 用户要求：下载时遇到旧 gif 也改名——本地存在旧原名 gif（无后缀）而新
+  //   localFile 不存在 → rename 原名 → localFile（统一新名，避免重复下载 + 同名覆盖）
+  for (const g of obj.gifs || []) {
+    if (!g || !g.localFile || g.localFile === g.file) continue;
+    const oldP = path.join(finalDir, g.file);
+    const newP = path.join(finalDir, g.localFile);
+    if (fs.existsSync(oldP) && !fs.existsSync(newP)) {
+      try { fs.renameSync(oldP, newP); console.log("[gif-rename]", g.file, "→", g.localFile); } catch (_) {}
+    }
+  }
   const items = buildDownloadItems(mod, finalDir, obj);
   const exists = new Set();
   for (const it of items) {
-    try { if (it.path && fs.existsSync(it.path) && fs.statSync(it.path).size > 0) exists.add(it.path); } catch (_) {}
+    try {
+      if (!it.path || !fs.existsSync(it.path)) continue;
+      const st = fs.statSync(it.path);
+      if (st.size <= 0) continue;
+      // 2026-08-30 用户要求：gif 本地文件大小与记录不符 → 重新下（记录同名而本地无后缀也重下）
+      if (it.isGif && it.size > 0 && st.size !== it.size) continue;
+      exists.add(it.path);
+    } catch (_) {}
   }
   // 2026-08-26 修复（用户要求：文件名一律按 GB 原名）：
   //   · 文件/图片按 GB 原名（_sFile 短名）落盘 → 目标路径存在即跳过（不看 hash）
@@ -866,7 +923,7 @@ function downloadToFile(item, settings, onProgress) {
         let received = resumeOffset;
         const total = contentLength + resumeOffset;
 
-        let stallLast = resumeOffset;
+        let stallLast = received; // 2026-08-30 修复：以网络接收量 received 判断停滞（原用 fs.statSync(tmp).size，慢网速时写盘缓冲延迟导致误报"停滞"）
         let stallCount = 0;
         stallTimer = setInterval(() => {
           if (done) { clearInterval(stallTimer); return; }
@@ -875,17 +932,15 @@ function downloadToFile(item, settings, onProgress) {
             try { req.destroy(new Error(task.abort ? "已停止" : "已暂停")); } catch (_) {}
             return;
           }
-          let cur = stallLast;
-          try { cur = fs.statSync(tmp).size; } catch (_) {}
-          if (cur === stallLast) {
+          if (received === stallLast) {
             stallCount++;
             if (stallCount >= 2) {
               clearInterval(stallTimer);
-              try { req.destroy(new Error("下载停滞（文件大小停止增长且未完成）")); } catch (_) {}
+              try { req.destroy(new Error("下载停滞（数据停止接收且未完成）")); } catch (_) {}
             }
           } else {
             stallCount = 0;
-            stallLast = cur;
+            stallLast = received;
           }
         }, 2000); // 2026-08-26 缩短到 2s：停止/暂停 2 秒内中断下载（原 20s 太慢），停滞检测仍 2 次×2s
 
@@ -1110,7 +1165,7 @@ async function doDownloadLoop() {
         saveTask();
         let r;
         try {
-          r = await executeDownloadItem(item, settings, (received, total) => {
+          r = await withPartLock(item.path + ".gbmd.part", () => executeDownloadItem(item, settings, (received, total) => {
             activeItem.received = received;
             activeItem.total = total;
             const now = Date.now();
@@ -1123,7 +1178,7 @@ async function doDownloadLoop() {
                 activeItem._spLast = received;
               }
             }
-          });
+          }));
           resultsByIndex.set(idx, r);
         } catch (e) {
           resultsByIndex.set(idx, { path: item.path, ok: false, error: e.message || String(e) });
@@ -1252,31 +1307,31 @@ async function finalizeHtmls() {
         }
       } catch (_) {}
       if (md5Reverted > 0) console.log(`[md5-revert] ${finalDir.split("/Mods/")[1] || finalDir} ← 还原 ${md5Reverted} 张 md5 名图片为 GB 原名`);
-      // 2026-08-26 用户要求：追加旧文件——扫描目标目录，把磁盘上实际存在但 HTML 未记录
-      //   的压缩包/图片（旧 mod、历史遗留、GB 页面已下架）补进 files/images（只读记录，不移动）
-      const diskNames = [];
-      try { diskNames = fs.readdirSync(finalDir); } catch (_) { diskNames = []; }
-      for (const dn of diskNames) {
-        if (dn.startsWith(".") || dn === "description.html") continue;
-        const dp = path.join(finalDir, dn);
-        let st = null;
-        try { st = fs.statSync(dp); } catch (_) {}
-        if (!st || !st.isFile()) continue;
-        const lower = dn.toLowerCase();
-        if (/\.(zip|rar|7z|tar|gz)$/.test(lower)) {
-          if (!(obj.files || []).some((x) => x && x.file === dn)) {
-            obj.files = obj.files || [];
-            obj.files.push({ file: dn, url: "", size: st.size, gbMd5: "", hash: "", description: "本地旧文件" });
-            changed = true;
-          }
-        } else if (isImageExt(dn)) {
-          if (!(obj.images || []).some((x) => x && (x.file === dn || x.gbFile === dn))) {
-            obj.images = obj.images || [];
-            obj.images.push({ file: dn, gbFile: dn, url: "", hash: "" });
-            changed = true;
+      // 2026-08-30 用户要求：整组完成时计算图片/gif md5 重新修改 HTML——对 hash 为空的
+      //   图片/gif（含已存在/跳过的）补算内容 md5 写回 HTML。
+      // 2026-08-30 用户要求：纯本地已失去记录的旧文件不再「磁盘扫描追加记录」（不移动不删除）
+      let md5Filled = 0;
+      for (const im of obj.images || []) {
+        if (!im || im.hash) continue;
+        const ip = path.join(finalDir, im.file || im.gbFile || "");
+        if (ip && fs.existsSync(ip)) {
+          const h = fileMd5Sync(ip);
+          if (h) { im.hash = h; md5Filled++; changed = true; }
+        }
+      }
+      for (const g of obj.gifs || []) {
+        if (!g || g.hash) continue;
+        const gp = path.join(finalDir, g.localFile || g.file || "");
+        if (gp && fs.existsSync(gp)) {
+          const h = fileMd5Sync(gp);
+          if (h) {
+            g.hash = h;
+            if (!g.size) { try { g.size = fs.statSync(gp).size; } catch (_) {} }
+            md5Filled++; changed = true;
           }
         }
       }
+      if (md5Filled > 0) console.log(`[md5-fill] ${(finalDir.split("/Mods/")[1] || finalDir).slice(0, 50)} ← 补算 ${md5Filled} 个 hash`);
       // 2026-08-26 修复：不再调用图片 md5 重命名收敛（文件名按 GB 原名，不重命名）
       if (changed) writeIndexHtml(finalDir, obj);
     } catch (_) {}

@@ -2,9 +2,10 @@
 # ============================================================
 # gbmd-v3 - Linux 启动脚本（支持 start/stop/restart/status）
 # 用法：
-#   启动（默认）：./start-linux.sh [start] [--port 8642]
+#   重启（默认）：./start-linux.sh [restart] [--port 8642]
+#   启动：        ./start-linux.sh start [--port 8642]
 #   停止：        ./start-linux.sh stop
-#   重启：        ./start-linux.sh restart [--port 8642]
+#   状态：        ./start-linux.sh status
 #   状态：        ./start-linux.sh status
 #   设置密码：    ./start-linux.sh --set-password "新密码"
 # ============================================================
@@ -144,11 +145,11 @@ if [[ "$1" == "--set-password" ]]; then
   exit 0
 fi
 
-# 判断命令（第一个参数）
-CMD="${1:-start}"               # 默认 start
+# 判断命令（第一个参数），空参数默认 restart
+CMD="${1:-restart}"             # 默认 restart
 if [[ "$CMD" == "--port" ]]; then
-  # 兼容旧用法：直接以 --port 开头，视为 start
-  CMD="start"
+  # 兼容旧用法：直接以 --port 开头，视为 restart
+  CMD="restart"
   shift
 elif [[ "$CMD" == "start" || "$CMD" == "stop" || "$CMD" == "restart" || "$CMD" == "status" ]]; then
   shift  # 去掉命令，剩余参数留给 start

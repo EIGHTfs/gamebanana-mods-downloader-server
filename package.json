@@ -1,62 +1,11 @@
 {
   "name": "gbmd-v3",
   "version": "3.0.0",
-  "description": "GameBanana Mod 下载器（网页版 + 桌面应用版）",
-  "main": "electron/main.js",
+  "description": "GameBanana Mod 下载器（网页版）",
   "author": "gbmd",
   "license": "MIT",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --dev",
-    "dist": "electron-builder",
-    "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win",
-    "dist:linux": "electron-builder --linux"
-  },
-  "devDependencies": {
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
-  },
-  "build": {
-    "appId": "com.gbmd.downloader",
-    "productName": "gbmd-v3",
-    "files": [
-      "electron/**/*",
-      "server/**/*",
-      "json/**/*",
-      "mapping/**/*",
-      "!server/config.json",
-      "!server/*.log",
-      "!server/sessions.json",
-      "!server/download_task.json",
-      "!server/search_task.json",
-      "!server/search_cache.json",
-      "!json/local-hash-index.json"
-    ],
-    "directories": {
-      "output": "dist",
-      "buildResources": "build"
-    },
-    "asar": true,
-    "mac": {
-      "target": [
-        { "target": "dmg", "arch": ["arm64", "x64"] },
-        { "target": "zip", "arch": ["arm64", "x64"] }
-      ],
-      "category": "public.app-category.utilities"
-    },
-    "win": {
-      "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
-      ]
-    },
-    "linux": {
-      "target": [
-        { "target": "AppImage", "arch": ["x64", "arm64"] },
-        { "target": "deb", "arch": ["x64", "arm64"] }
-      ],
-      "category": "Utility"
-    }
+    "start": "node server/app.js",
+    "dev": "node server/app.js --dev"
   }
 }

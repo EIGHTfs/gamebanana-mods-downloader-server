@@ -81,8 +81,7 @@ node server/app.js
 │   ├── gamebanana.com.json.example  # 游戏配置示例（复制为 gamebanana.com.json 后填真实下载路径）
 │   └── gb-hash-index.json     # GB 线上信息表（hash → mod 信息，随仓库共享）
 ├── mapping/                   # 每个游戏的仓库/角色映射（如 Genshin Impact.json）
-├── electron/                  # 桌面应用版（Electron 主进程）
-├── scripts/generate-mappings.js  # 映射生成辅助脚本
+├── scripts/git-push.sh        # GitHub 推送辅助（从项目本地 .git-push-token 读凭据，token 不入库）
 └── 启动脚本（start-linux.sh / start-macos.sh / start-windows*.bat）
 ```
 
@@ -191,24 +190,6 @@ node server/app.js
 - 启动时自动加载三张表
 - 每次新下载写完 HTML → **自动增量并入**（新 hash/原名立即可查，毫秒级）
 - 全量重建：设置页「重建索引」按钮（从全部 description.html 提取，约 6000 个 HTML 热缓存 1 秒）
-
----
-
-## 桌面应用版（Electron）
-
-`electron/main.js` + 根 `package.json`（electron-builder 配置）——把整个服务打成桌面应用：
-双击即启动后端 + 打开内嵌窗口，无需安装 Node、无需命令行。
-
-```bash
-npm install          # 安装 electron + electron-builder
-npm run dist:mac     # macOS (dmg/zip, arm64+x64)
-npm run dist:win     # Windows (nsis/portable)
-npm run dist:linux   # Linux (AppImage/deb)
-```
-
-**数据目录**：打包后 asar 只读，首次启动自动把 `json/`、`mapping/` 复制到系统用户数据目录（`~/Library/Application Support/gbmd/` 等），config.json 等运行态文件也写那里——升级不丢配置。
-
-> 未签名应用首次打开需右键 → 打开（macOS）/ SmartScreen 仍要运行（Windows）。
 
 ---
 

@@ -1,4 +1,4 @@
-# gbmd 纯前端 UI 模板（docs/ui-template/）
+# GameBanana Mod Downloader 纯前端 UI 模板（docs/ui-template/）
 
 > 本目录是 gamebanana-mods-downloader-server 网页的**纯前端可复用模板**：
 > 完整保留界面布局/样式/交互逻辑，但**不接入任何后端**——所有 API 由
@@ -47,7 +47,7 @@ docs/ui-template/
 ├── login.html        登录页（纯前端演示用）
 ├── setup.html        首次设置页（纯前端演示用）
 ├── style.css         全部样式（含白天/夜间主题变量）
-├── favicon.png       浏览器标签页图标（72px 香蕉）
+├── favicon.png       浏览器标签页图标（72px，照搬香蕉网官方香蕉 logo，非自绘）
 ├── app.js            前端交互逻辑（模板版，已去后端耦合）
 ├── mock-api.js       ★ 模拟后端层：全局 api() + fetch 接管 + 接口契约注释
 ├── template-runtime-check.js   验证脚本（fake-DOM 跑 init，确认无未捕获异常）

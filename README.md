@@ -1,4 +1,4 @@
-# gbmd · GameBanana Mod 下载器
+# GameBanana Mod Downloader
 
 > 零依赖、单进程 Node.js 服务：从 [GameBanana](https://gamebanana.com) 搜索、下载并自动整理 Mod。
 > 自带网页界面（浏览器访问），可选打包为桌面应用（Electron，见下文）。

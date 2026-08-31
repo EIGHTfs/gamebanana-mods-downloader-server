@@ -635,6 +635,22 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // ---- 油猴脚本下载（2026-09-01 参照 iwara-downloader：顶部「📥 油猴脚本」→ 附件下载）----
+    // 脚本单一来源：项目根 scripts/gamebanana-cookie-userscript.user.js（SA6400 与本地同源）
+    if (method === "GET" && (pathname === "/userscript" || pathname === "/userscript.user.js" || pathname === "/gamebanana-cookie-userscript.user.js")) {
+      const scriptPath = path.join(__dirname, "..", "scripts", "gamebanana-cookie-userscript.user.js");
+      fs.readFile(scriptPath, (err, data) => {
+        if (err) return sendJson(res, 404, { ok: false, error: "油猴脚本不存在" });
+        res.writeHead(200, {
+          "Content-Type": "text/javascript; charset=utf-8",
+          "Content-Disposition": "attachment; filename=gamebanana-cookie-userscript.user.js",
+          "Cache-Control": "no-store"
+        });
+        res.end(data);
+      });
+      return;
+    }
+
     // ---- 静态页面 ----
     if (!pathname.startsWith("/api/")) {
       if (!cfg.readConfig().passwordHash) {

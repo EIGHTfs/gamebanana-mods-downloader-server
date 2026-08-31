@@ -20,6 +20,12 @@
 const MOCK_ROUTES = [
   // ---------- 系统/会话 ----------
   {
+    match: (p) => p === "/userscript" || p === "/userscript.user.js" || p === "/gamebanana-cookie-userscript.user.js",
+    get: () => ({ ok: true }),
+    blob: () => "// ==UserScript==\n// @name         GameBanana Cookie/登录态获取器（模板演示版）\n// @version      9.9.9\n// ==/UserScript==\n// 模板模式：无真实脚本，接真实后端后 /userscript 返回 scripts/gamebanana-cookie-userscript.user.js\n",
+    note: "真实返回：attachment 下载 scripts/gamebanana-cookie-userscript.user.js（Content-Disposition: attachment）",
+  },
+  {
     match: (p) => p === "/api/status",
     get: () => ({ ok: true, needsSetup: false, needsAuth: false, version: "template" }),
     note: "真实返回：{ ok, needsSetup, needsAuth } — needsSetup=true 显示未设密码警告；needsAuth=true 且未登录跳登录页",

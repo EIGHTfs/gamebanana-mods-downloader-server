@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "app": "gbmd",
+  "note": "gbmd 用户数据文件清单。备份/恢复（设置页「数据备份/恢复」）按此收集与写回；files 为精确文件，dirs 为目录内按后缀收集。改动此清单前先确认路径归属。",
+  "files": [
+    { "rel": "server/config.json",       "desc": "服务配置：访问密码哈希、gbCookie、sessionHours、端口等（gitignore 排除，不入库）" },
+    { "rel": "server/sessions.json",     "desc": "登录会话（启动时加载一次，导入后需重启生效）" },
+    { "rel": "server/download_task.json","desc": "下载任务列表（含进度/状态，启动时恢复，导入后需重启生效）" },
+    { "rel": "server/search_task.json",  "desc": "搜索任务（关键词搜索的进行中任务）" },
+    { "rel": "server/search_cache.json", "desc": "搜索记录缓存（关键词/按时间搜索的已存结果）" },
+    { "rel": "json/gamebanana.com.json", "desc": "游戏配置：每个游戏的中文名/香蕉网 id/本地下载根路径（gitignore 排除，不入库）" },
+    { "rel": "json/gb-hash-index.json",  "desc": "GB 信息表索引（hash → 线上 mod 信息，重建可生成）" },
+    { "rel": "json/local-hash-index.json","desc": "本地哈希索引（hash → 实际下载位置，本机特有）" },
+    { "rel": "json/html-name-index.json","desc": "HTML 原名索引（GB 原名短名 → mod，扫描 description.html 生成）" }
+  ],
+  "dirs": [
+    { "rel": "mapping",     "suffix": ".json", "desc": "角色映射（手动添加/变体：角色英文名 → 中文名，每游戏一个文件）" },
+    { "rel": "json/role",   "suffix": ".json", "desc": "角色缓存（香蕉网角色信息，运行中生成）" }
+  ]
+}

@@ -922,6 +922,56 @@ function bindSettings() {
     }
   });
 
+  // ---- 数据备份/恢复（2026-08-31 用户要求：zip 导出/导入全部用户数据）----
+  $("#exportDataBtn").addEventListener("click", async () => {
+    const st = $("#dataStatus");
+    st.textContent = "正在导出…";
+    st.className = "status";
+    try {
+      const r = await fetch("/api/data/export");
+      if (r.status === 401) { location.href = "/login.html"; return; }
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || "导出失败"); }
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "gbmd-userdata-" + new Date().toISOString().slice(0, 10) + ".zip";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      st.textContent = "✅ 已导出用户数据 zip（含全部清单文件）";
+      st.className = "status ok";
+    } catch (e) {
+      st.textContent = "导出失败: " + (e && e.message || e);
+      st.className = "status err";
+    }
+  });
+
+  $("#importDataBtn").addEventListener("click", () => { $("#importDataFile").click(); });
+  $("#importDataFile").addEventListener("change", async (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    const st = $("#dataStatus");
+    if (!file) return;
+    st.textContent = "正在导入 " + file.name + " …";
+    st.className = "status";
+    try {
+      const b64 = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result).split(",")[1] || "");
+        fr.onerror = reject;
+        fr.readAsDataURL(file);
+      });
+      if (!b64) throw new Error("读取文件失败");
+      const r = await api("/api/data/import", "POST", { data: b64 });
+      if (!r.ok) throw new Error(r.error || "导入失败");
+      st.textContent = `✅ 导入完成：恢复 ${r.restored.length} 个文件，跳过 ${r.skipped.length} 个` + (r.note ? "。" + r.note : "");
+      st.className = "status ok";
+    } catch (e) {
+      st.textContent = "导入失败: " + (e && e.message || e);
+      st.className = "status err";
+    } finally {
+      ev.target.value = "";
+    }
+  });
+
   // ---- HTML 反查（2026-08-26：hash md5 或图片原始短名都支持）----
   // 三表：本地表命中（source=local）→ 有实际落盘路径；GB 表命中（source=gb）→ 仅线上信息；
   //       HTML 表命中（source=html）→ 按 GB 原名（图片短名/压缩包名）从 description.html 反查

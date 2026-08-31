@@ -11,6 +11,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const urlMod = require("url");
+const os = require("os");
 
 const cfg = require("./config");
 const auth = require("./auth");
@@ -18,6 +19,7 @@ const gbApi = require("./lib/gb-api");
 const downloader = require("./lib/downloader");
 const search = require("./lib/search");
 const mergeDirs = require("./lib/merge-dirs");
+const dataBackup = require("./lib/data-backup");
 const hashIndex = require("./lib/hash-index");
 
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -424,6 +426,36 @@ const server = http.createServer(async (req, res) => {
       res.setHeader("Content-Type", "application/json");
       res.setHeader("Content-Disposition", `attachment; filename="gbmd-search-records-${new Date().toISOString().slice(0, 10)}.json"`);
       return res.end(JSON.stringify(cache, null, 2));
+    }
+
+    // ---- 用户数据备份/恢复（2026-08-31 用户要求：zip 导出/导入全部用户数据，按 userdata-manifest.json 清单）----
+    if (method === "GET" && pathname === "/api/data/export") {
+      try {
+        const buf = await dataBackup.exportZip();
+        res.setHeader("Content-Type", "application/zip");
+        res.setHeader("Content-Disposition", `attachment; filename="gbmd-userdata-${new Date().toISOString().slice(0, 10)}.zip"`);
+        return res.end(buf);
+      } catch (e) {
+        return sendJson(res, 500, { ok: false, error: "备份失败: " + (e && e.message || e) });
+      }
+    }
+    if (method === "POST" && pathname === "/api/data/import") {
+      const body = await readBody(req, 512 * 1024 * 1024); // zip 可能几十 MB，放大限制
+      const b64 = body && (body.data || body.zip);
+      if (!b64 || typeof b64 !== "string") return sendJson(res, 400, { ok: false, error: "缺少 zip 数据（data 字段，base64）" });
+      let zipBuf;
+      try { zipBuf = Buffer.from(b64, "base64"); }
+      catch (e) { return sendJson(res, 400, { ok: false, error: "zip 数据解码失败" }); }
+      const zipPath = path.join(os.tmpdir(), "gbmd-upload-" + Date.now() + ".zip");
+      fs.writeFileSync(zipPath, zipBuf);
+      try {
+        const r = await dataBackup.importZip(zipPath);
+        return sendJson(res, 200, r);
+      } catch (e) {
+        return sendJson(res, 400, { ok: false, error: "导入失败: " + (e && e.message || e) });
+      } finally {
+        try { fs.unlinkSync(zipPath); } catch (_) {}
+      }
     }
 
     // ---- 下载（四步流程：生成HTML → 查重归位 → 整理 → 正式下载）----

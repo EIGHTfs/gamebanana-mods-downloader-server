@@ -122,6 +122,8 @@ function loadGameSelects() {
     if (mm) mm.innerHTML = opts;
     const mmAdd = $("#mmAddGame");
     if (mmAdd) mmAdd.innerHTML = opts;
+    const mmEmpty = $("#mmEmptyGame");
+    if (mmEmpty) mmEmpty.innerHTML = opts;
   }).catch(() => {});
 }
 
@@ -1112,9 +1114,46 @@ async function mergeRolesRun() {
   mergePlan = [];
 }
 
+// ---------- 清空空文件夹（2026-08-31 用户要求：空壳/仅含HTML也算，选游戏，带被清目录预览）----------
+let emptyPlan = [];
+async function emptyDirsPreview() {
+  const game = $("#mmEmptyGame").value;
+  const st = $("#mmEmptyStatus");
+  if (!game) { st.textContent = "请先选择游戏"; st.className = "status err"; return; }
+  st.textContent = "扫描空文件夹…";
+  st.className = "status";
+  const d = await api("/api/cleanup-empty-dirs", "POST", { dryRun: true, game });
+  const el = $("#mmEmptyPlan");
+  if (!d || !d.ok) { st.textContent = "失败: " + ((d && d.error) || "未知"); st.className = "status err"; return; }
+  emptyPlan = (d.cleared || []).map((m) => m.dir);
+  st.textContent = `发现 ${emptyPlan.length} 个空文件夹（空壳/仅含HTML，预览见下）`;
+  st.className = "status ok";
+  el.innerHTML = emptyPlan.length
+    ? emptyPlan.map((dir) => `<div class="mm-mis">🗑 ${esc((dir || "").split("/Mods/")[1] || dir)}</div>`).join("")
+    : '<div class="hint">没有空文件夹</div>';
+}
+async function emptyDirsRun() {
+  if (!emptyPlan.length) { alert("请先「预览待清空」"); return; }
+  if (!confirm(`确认清空 ${emptyPlan.length} 个空文件夹（空壳/仅含HTML，进游戏根 .trash 可恢复）？`)) return;
+  const game = $("#mmEmptyGame").value;
+  const st = $("#mmEmptyStatus");
+  st.textContent = "清空中…";
+  st.className = "status";
+  const d = await api("/api/cleanup-empty-dirs", "POST", { dryRun: false, game });
+  if (!d || !d.ok) { st.textContent = "失败: " + ((d && d.error) || "未知"); st.className = "status err"; return; }
+  st.textContent = `已清空：${(d.cleared || []).length} 个，跳过 ${(d.skipped || []).length} 个（已进 .trash 可恢复）`;
+  st.className = "status ok";
+  $("#mmEmptyPlan").innerHTML = "";
+  emptyPlan = [];
+}
+
 function bindMerge() {
   $("#mmMergeBtn").addEventListener("click", mergeRolesPreview);
   $("#mmMergeGoBtn").addEventListener("click", mergeRolesRun);
+
+  // ---- 2026-08-31 用户要求：清空空文件夹（空壳/仅含HTML也算，选游戏，带预览）----
+  $("#mmEmptyBtn").addEventListener("click", emptyDirsPreview);
+  $("#mmEmptyGoBtn").addEventListener("click", emptyDirsRun);
 
   // ---- 2026-08-26 用户要求：手动添加映射（选游戏/仓库 → 从香蕉网获取角色列表 → 写入 mapping JSON）----
   // 级联（2026-08-26 用户要求）：先选游戏 → 才能选仓库；先选仓库 → 才能选角色（英文名）

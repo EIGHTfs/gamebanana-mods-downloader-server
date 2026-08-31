@@ -188,6 +188,20 @@ try {
       </div>
       <div id="mmMergePlan"></div>
 
+      <!-- 2026-08-31 用户要求：清空空文件夹（空壳/仅含 HTML 也算，选游戏，带被清目录预览） -->
+      <h3 style="margin:14px 0 8px;font-size:14px;color:var(--primary)">🧹 清空空文件夹（空壳 / 仅含 HTML）</h3>
+      <div class="row">
+        <label>游戏
+          <select id="mmEmptyGame">
+            <option value="">— 请选择游戏 —</option>
+          </select>
+        </label>
+        <button id="mmEmptyBtn" type="button">预览待清空</button>
+        <button id="mmEmptyGoBtn" type="button">确认清空</button>
+        <span class="status" id="mmEmptyStatus"></span>
+      </div>
+      <div id="mmEmptyPlan"></div>
+
       <!-- 2026-08-26 用户要求：手动添加映射（选游戏/选仓库/填英文名+中文名 → 写入 mapping JSON） -->
       <h3 style="margin:14px 0 8px;font-size:14px;color:var(--primary)">➕ 手动添加角色映射</h3>
       <div class="row">

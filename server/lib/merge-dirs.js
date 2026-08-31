@@ -204,4 +204,58 @@ function executeMerge(dups, dryRun, root) {
   return { merged, skipped, trashed };
 }
 
-module.exports = { roleEnOf, findRoleDuplicates, executeMerge };
+// ============================================================
+// 清空空文件夹（2026-08-31 用户要求增加网页手动功能）
+// 用户原话：「设置里面 文件夹合并（按映射重命名角色目录）里面加个手动功能，清空空文件夹
+//   （仅含HTML也算），也是选择游戏，要带被清空目录预览」
+// 空壳定义：目录内除 @eaDir（群晖元数据目录）外没有任何条目 = 完全空；
+//   或仅含 .html/.htm 文件（如 description.html）= 仅含HTML空壳（用户：仅含HTML也算）
+// 安全：不直接删除，一律 rename 进 root/.trash（可恢复，符合 safe-delete-trash 铁律）
+// 递归扫描整个游戏根，跳过 .trash 与 @eaDir；后序遍历（先处理子目录再判断父级）
+function findEmptyDirs(root) {
+  const empty = [];
+  if (!root || !fs.existsSync(root)) return empty;
+  const isHTML = (n) => /\.(html?|htm)$/i.test(n);
+  const walk = (dir) => {
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+    for (const e of entries) {
+      if (e.isDirectory() && e.name !== "@eaDir" && e.name !== ".trash") {
+        walk(path.join(dir, e.name)); // 先深入子目录
+      }
+    }
+    // 再判断本目录：除 @eaDir 外无任何条目 = 完全空
+    const real = entries.filter((e) => e.name !== "@eaDir");
+    if (real.length === 0) { empty.push(dir); return; }
+    // 仅含 HTML 文件（无子目录、无其他文件）= 空壳也算（用户：仅含HTML也算）
+    const allHTML = real.every((e) => !e.isDirectory() && isHTML(e.name));
+    if (allHTML) { empty.push(dir); }
+  };
+  walk(root);
+  return empty;
+}
+
+// 执行清空：把空壳目录整体 rename 进 root/.trash（可恢复），与合并共用 .trash 目录
+function cleanupEmptyDirs(emptyDirs, dryRun, root) {
+  const cleared = [], skipped = [];
+  const trashRoot = path.join(root, ".trash");
+  for (const dir of (emptyDirs || [])) {
+    if (dryRun) { cleared.push({ dir, dryRun: true }); continue; }
+    try {
+      // 执行前复核仍为空壳（防止预览后目录内新增了文件）
+      const entries = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.name !== "@eaDir");
+      const isHTML = (n) => /\.(html?|htm)$/i.test(n);
+      const stillEmpty = entries.length === 0 || entries.every((e) => !e.isDirectory() && isHTML(e.name));
+      if (!stillEmpty) { skipped.push({ dir, reason: "执行时已非空壳" }); continue; }
+      fs.mkdirSync(trashRoot, { recursive: true });
+      const trash = path.join(trashRoot, new Date().toISOString().replace(/[:.]/g, "-") + "-" + path.basename(dir));
+      fs.renameSync(dir, trash);
+      cleared.push({ dir, trash });
+    } catch (e) {
+      skipped.push({ dir, reason: e.message || String(e) });
+    }
+  }
+  return { cleared, skipped };
+}
+
+module.exports = { roleEnOf, findRoleDuplicates, executeMerge, findEmptyDirs, cleanupEmptyDirs };

@@ -1205,25 +1205,26 @@ async function updateGbUserBadge(r) {
   if (!el) return;
   try {
     if (!r) r = await api("/api/gb-login-status");
+    const name = r.username || "";
+    const remain = fmtGbLoginRemain(r);
+    // 2026-09-01 顶部两行：第一行用户名（加粗），第二行剩多少天
     if (!r || !r.cookieSet) {
-      el.textContent = "未配置凭证";
-      el.className = "sub gb-user-err";
+      el.innerHTML = "<b>未配置凭证</b><span>需粘贴 Cookie</span>";
+      el.className = "sub hcol gb-user-err";
       el.title = "设置页粘贴 GameBanana Cookie（sess+rmc）";
       return;
     }
-    const name = r.username || "";
-    const remain = fmtGbLoginRemain(r);
     if (r.warnLevel === "expired" || !r.loggedIn) {
-      el.textContent = r.warnLevel === "expired" ? ("❌ 已过期" + (remain ? " · " + remain : "")) : ("❌ " + (r.error || "未登录"));
-      el.className = "sub gb-user-err";
+      el.innerHTML = "<b>" + (r.warnLevel === "expired" ? "已过期" : "未登录") + "</b><span>" + (remain ? remain : "") + "</span>";
+      el.className = "sub hcol gb-user-err";
       el.title = r.detail || "GameBanana Cookie 已过期，请重新复制";
     } else if (r.warnLevel === "warn") {
-      el.textContent = "⚠️ " + (name || "已登录") + (remain ? " · " + remain : "");
-      el.className = "sub gb-user-warn";
+      el.innerHTML = "<b>" + (name || "已登录") + "</b><span>⚠️ " + remain + "</span>";
+      el.className = "sub hcol gb-user-warn";
       el.title = r.profileUrl || "GameBanana 已登录用户";
     } else {
-      el.textContent = "👤 " + (name || "已登录") + (remain ? " · " + remain : "");
-      el.className = "sub gb-user-ok";
+      el.innerHTML = "<b>" + (name || "已登录") + "</b><span>" + (remain || "") + "</span>";
+      el.className = "sub hcol gb-user-ok";
       el.title = r.profileUrl || "GameBanana 已登录用户";
     }
   } catch (_) {
@@ -1510,7 +1511,13 @@ async function init() {
     }
   } catch (_) {}
   setInterval(() => {
-    $("#serverTime").textContent = new Date().toLocaleString("zh-CN", { hour12: false });
+    function updServerTime() {
+      const t = new Date();
+      // 2026-09-01 顶部两行：年月日 / 时分秒
+      $("#serverTime").innerHTML = "<b>" + t.toLocaleDateString("zh-CN") + "</b><span>" + t.toLocaleTimeString("zh-CN", { hour12: false }) + "</span>";
+    }
+    updServerTime();
+    setInterval(updServerTime, 1000);
   }, 1000);
 }
 

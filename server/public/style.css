@@ -53,6 +53,12 @@ header {
 header h1 { margin: 0; font-size: 20px; }
 .sub { color: var(--muted); font-size: 12px; }
 .right { display: flex; align-items: center; gap: 12px; }
+/* 2026-09-01 顶部右侧三块各自竖排两行（用户名/剩多少天、年月日/时分秒、📥/油猴脚本） */
+.hcol { display: flex; flex-direction: column; line-height: 1.35; text-align: center; white-space: nowrap; }
+.hcol b { font-weight: 600; font-size: 13px; }
+.hbtn { display: flex; flex-direction: column; align-items: center; gap: 0; padding: 4px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card2); color: var(--text); line-height: 1.3; }
+.hbtn-icon { font-size: 15px; }
+.hbtn-txt { font-size: 12px; }
 /* 2026-09-01 顶部当前登录用户名（时间前） */
 /* 2026-09-01 顶栏徽章三态（参照 iwara 顶栏徽标：ok/warn/err，圆角底；夜间模式单独写浅色底） */
 #gbUserBadge.gb-user-ok, #gbUserBadge.gb-user-warn, #gbUserBadge.gb-user-err {
@@ -273,6 +279,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
   .card { padding: 14px; }
   header { flex-wrap: wrap; gap: 6px; padding: 10px 14px; }
   header .sub { display: none; }
+  /* 2026-09-01 顶部两行块：窄屏下徽章/时间/油猴按钮换行展示 */
+  .right { flex-wrap: wrap; gap: 8px; }
   .tabs { overflow-x: auto; }
   .tab { flex: 0 0 auto; min-width: 92px; padding: 10px 8px; }
   button { padding: 10px 14px; }

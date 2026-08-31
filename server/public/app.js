@@ -32,6 +32,13 @@ function esc(s) {
     .replace(/"/g, "&quot;");
 }
 
+// 2026-08-31 优美化：统一状态行写入（文本 + 样式），替代散落的 textContent/className 样板
+function setStatus(el, msg, type) {
+  if (!el) return;
+  el.textContent = msg;
+  el.className = type && type !== "status" ? "status " + type : "status";
+}
+
 function fmtTs(ts) {
   if (!ts) return "-";
   const d = new Date(ts * 1000);
@@ -285,8 +292,8 @@ async function keywordSearch() {
   const q = ($("#kwInput").value || "").trim();
   const game = $("#searchGameSelect").value;
   const st = $("#kwStatus");
-  if (!q || !game) { if (st) { st.textContent = "请输入关键词并选择游戏"; st.className = "status err"; } return; }
-  if (st) { st.textContent = "搜索中…"; st.className = "status"; }
+  if (!q || !game) { if (st) setStatus(st, "请输入关键词并选择游戏", "err"); return; }
+  if (st) { setStatus(st, "搜索中…", ""); }
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const r = await api("/api/keyword-search?q=" + encodeURIComponent(q) + "&game=" + encodeURIComponent(game) + "&perpage=50&max=100");
@@ -306,8 +313,8 @@ async function keywordSearch() {
       }
       return;
     } catch (e) {
-      if (attempt < 2) { if (st) { st.textContent = "网络抖动，重试 " + (attempt + 1) + "/2…"; st.className = "status"; } await new Promise((r2) => setTimeout(r2, 1500)); }
-      else { if (st) { st.textContent = "搜索失败: " + e.message; st.className = "status err"; } }
+      if (attempt < 2) { if (st) { setStatus(st, "网络抖动，重试 " + (attempt + 1) + "/2…", ""); } await new Promise((r2) => setTimeout(r2, 1500)); }
+      else { if (st) setStatus(st, "搜索失败: " + e.message, "err"); }
     }
   }
 }
@@ -333,11 +340,11 @@ function bindKeywordSearch() {
         if (!r.ok) throw new Error(r.error || "获取失败");
         kwRoleChars = r.characters || [];
         roleInput.placeholder = "输入过滤，如 Od → Odette";
-        if (st) { st.textContent = `已加载 ${kwRoleChars.length} 个角色${r.fromCache ? "（缓存）" : ""}（选角色后自动搜索；设置页可手动刷新）`; st.className = "status ok"; }
+        if (st) setStatus(st, `已加载 ${kwRoleChars.length} 个角色${r.fromCache ? "（缓存）" : ""}（选角色后自动搜索；设置页可手动刷新）`, "ok");
         return;
       } catch (e) {
-        if (attempt === 0) { if (st) { st.textContent = "获取角色列表失败，重试…"; st.className = "status"; } await new Promise((r2) => setTimeout(r2, 1200)); }
-        else { if (st) { st.textContent = "获取角色列表失败: " + e.message; st.className = "status err"; } roleInput.placeholder = "加载失败，可手动输入"; }
+        if (attempt === 0) { if (st) { setStatus(st, "获取角色列表失败，重试…", ""); } await new Promise((r2) => setTimeout(r2, 1200)); }
+        else { if (st) setStatus(st, "获取角色列表失败: " + e.message, "err"); roleInput.placeholder = "加载失败，可手动输入"; }
       }
     }
   });
@@ -450,14 +457,14 @@ function bindProgress() {
   });
   $("#retryBtn").addEventListener("click", async () => {
     const r = await api("/api/task/retry-failed", "POST", {});
-    if (r && r.ok) { if (r.message) alert(r.message); try { const t = await api("/api/task"); renderTask(t.task); } catch (_) {} }
-    else alert((r && r.error) || "重试失败");
+    if (r && r.ok) { if (r.message) showFeedback(r.message, "ok"); try { const t = await api("/api/task"); renderTask(t.task); } catch (_) {} }
+    else showFeedback((r && r.error) || "重试失败", "err");
   });
   // 2026-08-26 用户要求加回：一键清除下载失败（失败项标记跳过，前端立即消失）
   $("#clearFailBtn").addEventListener("click", async () => {
     const r = await api("/api/skip-all-failed", "POST", {});
-    if (r && r.ok) { if (r.skipped > 0 && r.message) alert(r.message); try { const t = await api("/api/task"); renderTask(t.task); } catch (_) {} }
-    else alert((r && r.error) || "清除失败失败");
+    if (r && r.ok) { if (r.skipped > 0 && r.message) showFeedback(r.message, "ok"); try { const t = await api("/api/task"); renderTask(t.task); } catch (_) {} }
+    else showFeedback((r && r.error) || "清除失败失败", "err");
   });
   // 2026-08-26 用户要求加回：失败行 🔄重试 / 🚫跳过 按钮（事件委托）
   document.addEventListener("click", async (ev) => {
@@ -465,8 +472,8 @@ function bindProgress() {
     if (retryBtn) {
       ev.preventDefault();
       const r = await api("/api/task/retry-failed", "POST", {});
-      if (r && r.ok) { if (r.message) alert(r.message); try { const t = await api("/api/task"); renderTask(t.task); } catch (_) {} }
-      else alert((r && r.error) || "重试失败");
+      if (r && r.ok) { if (r.message) showFeedback(r.message, "ok"); try { const t = await api("/api/task"); renderTask(t.task); } catch (_) {} }
+      else showFeedback((r && r.error) || "重试失败", "err");
       return;
     }
     const skipBtn = ev.target.closest(".mm-skip-btn");
@@ -474,7 +481,7 @@ function bindProgress() {
       ev.preventDefault();
       const r = await api("/api/skip", "POST", { url: skipBtn.dataset.url, path: skipBtn.dataset.path });
       if (r && r.ok) { try { const t = await api("/api/task"); renderTask(t.task); } catch (_) {} }
-      else alert((r && r.error) || "跳过失败");
+      else showFeedback((r && r.error) || "跳过失败", "err");
       return;
     }
   });
@@ -484,25 +491,25 @@ function bindProgress() {
     const input = $("#concurrencyInput");
     const st = $("#concurrencyStatus");
     const v = parseInt(input.value, 10);
-    if (!v || v < 1) { if (st) { st.textContent = "并发数无效（至少 1）"; st.className = "status err"; } return; }
+    if (!v || v < 1) { if (st) setStatus(st, "并发数无效（至少 1）", "err"); return; }
     btn.disabled = true;
     btn.textContent = "应用中…";
-    if (st) { st.textContent = "应用并发数…"; st.className = "status"; }
+    if (st) { setStatus(st, "应用并发数…", ""); }
     try {
       const r = await api("/api/task/concurrency", "POST", { concurrency: v });
       if (r && r.ok) {
         input.value = r.concurrency;
-        if (st) { st.textContent = "✅ 并发数已设为 " + r.concurrency; st.className = "status ok"; }
+        if (st) setStatus(st, "✅ 并发数已设为 " + r.concurrency, "ok");
         // 立即拉最新任务刷新显示
         try {
           const t = await api("/api/task");
           if (t && t.task) renderTask(t.task);
         } catch (_) {}
       } else {
-        if (st) { st.textContent = "应用失败：" + ((r && r.error) || "未知错误"); st.className = "status err"; }
+        if (st) setStatus(st, "应用失败：" + ((r && r.error) || "未知错误"), "err");
       }
     } catch (e) {
-      if (st) { st.textContent = "应用失败：" + (e.message || String(e)); st.className = "status err"; }
+      if (st) setStatus(st, "应用失败：" + (e.message || String(e)), "err");
     } finally {
       btn.disabled = false;
       btn.textContent = "应用";
@@ -864,8 +871,8 @@ function bindSettings() {
   $("#fetchGameBtn").addEventListener("click", async () => {
     const id = parseInt($("#addGameId").value, 10);
     const st = $("#addGameStatus");
-    if (!id || id <= 0) { st.textContent = "请输入香蕉网游戏 id"; st.className = "status err"; return; }
-    st.textContent = "获取中…"; st.className = "status";
+    if (!id || id <= 0) { setStatus(st, "请输入香蕉网游戏 id", "err"); return; }
+    setStatus(st, "获取中…", "");
     try {
       const r = await api("/api/gb-game-info?id=" + id);
       if (!r.ok) throw new Error(r.error || "获取失败");
@@ -990,7 +997,7 @@ function bindSettings() {
   async function hashQuery() {
     const h = String($("#hashInput").value || "").trim();
     const st = $("#hashStatus"), res = $("#hashResult");
-    if (!h) { st.textContent = "请输入 hash 或图片短名"; st.className = "status err"; return; }
+    if (!h) { setStatus(st, "请输入 hash 或图片短名", "err"); return; }
     st.className = "status";
     st.textContent = "查询中…";
     try {
@@ -1023,14 +1030,14 @@ function bindSettings() {
       if (dlBtn) {
         dlBtn.addEventListener("click", async () => {
           const ds = $("#hashDlStatus");
-          if (ds) { ds.textContent = "已提交下载…"; ds.className = "status"; }
+          if (ds) { setStatus(ds, "已提交下载…", ""); }
           try {
             const rr = await api("/api/download", "POST", { links: [r.mod.url] });
             if (!rr.ok) throw new Error(rr.error || "提交失败");
-            if (ds) { ds.textContent = "✅ 已加入下载（见「下载进度」页）"; ds.className = "status ok"; }
+            if (ds) { setStatus(ds, "✅ 已加入下载（见「下载进度」页）", "ok"); }
             dlBtn.disabled = true;
           } catch (e) {
-            if (ds) { ds.textContent = "失败: " + e.message; ds.className = "status err"; }
+            if (ds) { setStatus(ds, "失败: " + e.message, "err"); }
           }
         });
       }
@@ -1079,7 +1086,7 @@ function bindSettings() {
   async function hashSearch() {
     const q = String($("#hashSearchInput").value || "").trim();
     const st = $("#hashSearchStatus"), res = $("#hashSearchResult");
-    if (q.length < 2) { st.textContent = "关键词至少 2 个字符"; st.className = "status err"; return; }
+    if (q.length < 2) { setStatus(st, "关键词至少 2 个字符", "err"); return; }
     st.className = "status";
     st.textContent = "搜索中…";
     try {
@@ -1174,12 +1181,12 @@ let mergePlan = [];
 async function mergeRolesPreview() {
   const game = $("#mmGameSelect").value;
   const st = $("#mmMergeStatus");
-  if (!game) { st.textContent = "请先选择游戏"; st.className = "status err"; return; }
+  if (!game) { setStatus(st, "请先选择游戏", "err"); return; }
   st.textContent = "扫描角色目录…";
   st.className = "status";
   const d = await api("/api/merge-roles", "POST", { dryRun: true, game });
   const el = $("#mmMergePlan");
-  if (!d || !d.ok) { st.textContent = "失败: " + ((d && d.error) || "未知"); st.className = "status err"; return; }
+  if (!d || !d.ok) { setStatus(st, "失败: " + ((d && d.error) || "未知"), "err"); return; }
   mergePlan = d.merged || [];
   st.textContent = `发现 ${d.groups} 组可合并角色目录（${mergePlan.length} 个将归一到标准「英文 – 中文」，变体目录并入标准目录）`;
   st.className = "status ok";
@@ -1188,14 +1195,14 @@ async function mergeRolesPreview() {
     : '<div class="hint">无需要合并的角色目录</div>';
 }
 async function mergeRolesRun() {
-  if (!mergePlan.length) { alert("请先「预览合并计划」"); return; }
+  if (!mergePlan.length) { showFeedback("请先「预览合并计划」", "err"); return; }
   if (!confirm(`执行合并：${mergePlan.length} 个目录归一为「英文 – 中文」（变体目录并入标准目录；同角色已有规范目录则并入，空目录进 .trash）？`)) return;
   const game = $("#mmGameSelect").value;
   const st = $("#mmMergeStatus");
   st.textContent = "合并中…";
   st.className = "status";
   const d = await api("/api/merge-roles", "POST", { dryRun: false, game });
-  if (!d || !d.ok) { st.textContent = "失败: " + ((d && d.error) || "未知"); st.className = "status err"; return; }
+  if (!d || !d.ok) { setStatus(st, "失败: " + ((d && d.error) || "未知"), "err"); return; }
   st.textContent = `合并完成：${(d.merged || []).length} 个目录，${(d.skipped || []).length} 跳过，${(d.trashed || []).length} 进回收站`;
   st.className = "status ok";
   $("#mmMergePlan").innerHTML = "";
@@ -1207,12 +1214,12 @@ let emptyPlan = [];
 async function emptyDirsPreview() {
   const game = $("#mmEmptyGame").value;
   const st = $("#mmEmptyStatus");
-  if (!game) { st.textContent = "请先选择游戏"; st.className = "status err"; return; }
+  if (!game) { setStatus(st, "请先选择游戏", "err"); return; }
   st.textContent = "扫描空文件夹…";
   st.className = "status";
   const d = await api("/api/cleanup-empty-dirs", "POST", { dryRun: true, game });
   const el = $("#mmEmptyPlan");
-  if (!d || !d.ok) { st.textContent = "失败: " + ((d && d.error) || "未知"); st.className = "status err"; return; }
+  if (!d || !d.ok) { setStatus(st, "失败: " + ((d && d.error) || "未知"), "err"); return; }
   emptyPlan = (d.cleared || []).map((m) => m.dir);
   st.textContent = `发现 ${emptyPlan.length} 个空文件夹（空壳/仅含HTML，预览见下）`;
   st.className = "status ok";
@@ -1221,14 +1228,14 @@ async function emptyDirsPreview() {
     : '<div class="hint">没有空文件夹</div>';
 }
 async function emptyDirsRun() {
-  if (!emptyPlan.length) { alert("请先「预览待清空」"); return; }
+  if (!emptyPlan.length) { showFeedback("请先「预览待清空」", "err"); return; }
   if (!confirm(`确认清空 ${emptyPlan.length} 个空文件夹（空壳/仅含HTML，进游戏根 .trash 可恢复）？`)) return;
   const game = $("#mmEmptyGame").value;
   const st = $("#mmEmptyStatus");
   st.textContent = "清空中…";
   st.className = "status";
   const d = await api("/api/cleanup-empty-dirs", "POST", { dryRun: false, game });
-  if (!d || !d.ok) { st.textContent = "失败: " + ((d && d.error) || "未知"); st.className = "status err"; return; }
+  if (!d || !d.ok) { setStatus(st, "失败: " + ((d && d.error) || "未知"), "err"); return; }
   st.textContent = `已清空：${(d.cleared || []).length} 个，跳过 ${(d.skipped || []).length} 个（已进 .trash 可恢复）`;
   st.className = "status ok";
   $("#mmEmptyPlan").innerHTML = "";
@@ -1282,7 +1289,7 @@ function bindMerge() {
     const game = $("#mmAddGame").value;
     const st = $("#mmAddStatus");
     if (!game) return;
-    if (st) { st.textContent = force ? "从香蕉网重新获取角色列表…" : "加载角色列表…"; st.className = "status"; }
+    if (st) { setStatus(st, force ? "从香蕉网重新获取角色列表…" : "加载角色列表…", ""); }
     const qs = "/api/gb-characters?game=" + encodeURIComponent(game) + (force ? "&refresh=1" : "");
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
@@ -1297,14 +1304,14 @@ function bindMerge() {
         }
         return;
       } catch (e) {
-        if (attempt === 0) { if (st) { st.textContent = "网络抖动，重试…"; st.className = "status"; } await new Promise((r2) => setTimeout(r2, 1200)); }
-        else if (st) { st.textContent = "获取失败: " + e.message; st.className = "status err"; }
+        if (attempt === 0) { if (st) { setStatus(st, "网络抖动，重试…", ""); } await new Promise((r2) => setTimeout(r2, 1200)); }
+        else if (st) setStatus(st, "获取失败: " + e.message, "err");
       }
     }
   }
   // 2026-08-27 用户要求：设置页「重新获取角色」按钮——强制从香蕉网拉取并保存 JSON
   $("#mmRefreshChars").addEventListener("click", () => {
-    if (!$("#mmAddGame").value) { const st = $("#mmAddStatus"); if (st) { st.textContent = "请先选择游戏"; st.className = "status err"; } return; }
+    if (!$("#mmAddGame").value) { const st = $("#mmAddStatus"); if (st) setStatus(st, "请先选择游戏", "err"); return; }
     loadGbCharacters(true);
   });
   // 可搜索角色下拉（自绘，最多显示 20 条，输入过滤）
@@ -1350,15 +1357,15 @@ function bindMerge() {
     const en = $("#mmAddEn").value.trim();
     const zh = $("#mmAddZh").value.trim();
     const st = $("#mmAddStatus");
-    if (!game || !en || !zh) { if (st) { st.textContent = "请选择游戏并填写英文名/中文名"; st.className = "status err"; } return; }
+    if (!game || !en || !zh) { if (st) setStatus(st, "请选择游戏并填写英文名/中文名", "err"); return; }
     try {
       const r = await api("/api/mapping/add-role", "POST", { game, en, zh });
       if (!r.ok) throw new Error(r.error || "添加失败");
-      if (st) { st.textContent = `已添加：${en} → ${zh}（已写入 mapping/${game}.json）`; st.className = "status ok"; }
+      if (st) setStatus(st, `已添加：${en} → ${zh}（已写入 mapping/${game}.json）`, "ok");
       $("#mmAddEn").value = "";
       $("#mmAddZh").value = "";
     } catch (e) {
-      if (st) { st.textContent = "添加失败: " + e.message; st.className = "status err"; }
+      if (st) setStatus(st, "添加失败: " + e.message, "err");
     }
   });
 }

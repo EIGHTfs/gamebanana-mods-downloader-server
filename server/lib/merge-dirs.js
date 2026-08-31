@@ -187,11 +187,13 @@ function executeMerge(dups, dryRun, root) {
           fs.renameSync(src, dst);
           files++;
         }
-        // 空目录进 .trash（可恢复，不直接删）
+        // 空目录进 .trash（可恢复，不直接删）——2026-08-31 用户要求：垃圾桶保留原始目录结构
         const rest = fs.readdirSync(plain).filter((n) => n !== "@eaDir");
         if (rest.length === 0) {
           fs.mkdirSync(trashRoot, { recursive: true });
-          const trash = path.join(trashRoot, new Date().toISOString().replace(/[:.]/g, "-") + "-" + path.basename(plain));
+          let trash = path.join(trashRoot, path.relative(root, plain)); // 保留相对 root 层级，不拍平
+          if (fs.existsSync(trash)) trash = trash + "-" + new Date().toISOString().replace(/[:.]/g, "-");
+          fs.mkdirSync(path.dirname(trash), { recursive: true });
           fs.renameSync(plain, trash);
           trashed.push(trash);
         }
@@ -235,20 +237,31 @@ function findEmptyDirs(root) {
   return empty;
 }
 
-// 执行清空：把空壳目录整体 rename 进 root/.trash（可恢复），与合并共用 .trash 目录
+// 执行清空：把空壳目录整体 rename 进「游戏 Mods 根」.trash（可恢复）
+// 2026-08-31 用户要求：清空必须保留文件夹层级——
+//   用户原话：「你清空没有保留文件夹层级，比如.Mods/(gamebanana)/(gamebanana)/NPC/.NPC/
+//     NPC Half Nude - Fontaine Elegant Dress NPC 清到垃圾桶也应该是
+//     .trash/.Mods/(gamebanana)/(gamebanana)/NPC/.NPC/NPC Half Nude - Fontaine Elegant Dress NPC」
+// 实现：trashRoot = 游戏根上级（Mods）/.trash；目标路径 = trashRoot + 相对完整路径
+//   （如 .trash/.Mods/(gamebanana)/(gamebanana)/NPC/.NPC/xxx），用户可依原层级找回
 function cleanupEmptyDirs(emptyDirs, dryRun, root) {
   const cleared = [], skipped = [];
+  // 2026-08-31 用户澄清：垃圾桶根 = 设置的游戏根（root/.trash），位置不变；
+  //   仅要求"垃圾"保留原始目录结构 —— trashRoot/<相对 root 层级>/<原名>，不拍平
   const trashRoot = path.join(root, ".trash");
   for (const dir of (emptyDirs || [])) {
-    if (dryRun) { cleared.push({ dir, dryRun: true }); continue; }
+    const rel = path.relative(root, dir); // 保留完整相对层级（角色/…/目录名）
+    let trash = path.join(trashRoot, rel);
+    if (dryRun) { cleared.push({ dir, trash, dryRun: true }); continue; }
     try {
       // 执行前复核仍为空壳（防止预览后目录内新增了文件）
       const entries = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.name !== "@eaDir");
       const isHTML = (n) => /\.(html?|htm)$/i.test(n);
       const stillEmpty = entries.length === 0 || entries.every((e) => !e.isDirectory() && isHTML(e.name));
       if (!stillEmpty) { skipped.push({ dir, reason: "执行时已非空壳" }); continue; }
-      fs.mkdirSync(trashRoot, { recursive: true });
-      const trash = path.join(trashRoot, new Date().toISOString().replace(/[:.]/g, "-") + "-" + path.basename(dir));
+      // 目标已存在（历史同名残留）→ 加时间戳避免覆盖
+      if (fs.existsSync(trash)) trash = trash + "-" + new Date().toISOString().replace(/[:.]/g, "-");
+      fs.mkdirSync(path.dirname(trash), { recursive: true });
       fs.renameSync(dir, trash);
       cleared.push({ dir, trash });
     } catch (e) {

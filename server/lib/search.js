@@ -246,6 +246,34 @@ function clearCache() {
   return { ok: true };
 }
 
+// 2026-08-31 用户要求：保存搜索结果（覆盖写入 search_cache.json）
+//   保存功能作用（用户原话）：「搜索结果覆盖写入 search_cache.json」
+function saveRecords(results) {
+  const list = Array.isArray(results) ? results : [];
+  // 规范化关键字段（与 importCache 一致），保证后续恢复显示/下载可用
+  const norm = [];
+  for (const r of list) {
+    const modId = String((r && (r.modId || r.id)) || "").trim();
+    if (!modId) continue;
+    norm.push({
+      modId,
+      name: String((r && (r.name || r.modName || r._sName)) || ""),
+      author: String((r && (r.author || (r._aSubmitter && r._aSubmitter._sName))) || ""),
+      game: String((r && (r.game || r.gameName)) || ""),
+      profileUrl: String((r && (r.profileUrl || r.url)) || (modId ? `https://gamebanana.com/mods/${modId}` : "")),
+      dateAdded: Number((r && (r.dateAdded || r._tsDateAdded)) || 0) || 0,
+      dateModified: Number((r && (r.dateModified || r._tsDateModified)) || 0) || 0,
+      dateUpdated: Number((r && (r.dateUpdated || r._tsDateUpdated)) || 0) || 0,
+      isNsfw: !!(r && (r.isNsfw || r.nsfw))
+    });
+  }
+  const cache = getCache() || { results: [], startDate: "", endDate: "", contentFilter: ["normal", "nsfw"], queryTime: 0 };
+  cache.results = norm;
+  cache.queryTime = Date.now();
+  saveCache(cache);
+  return { ok: true, total: norm.length };
+}
+
 function restorePendingQuery() {
   loadQueryTaskFromDisk();
   if (queryTask && queryTask.status === "running") runQueryLoop();
@@ -259,5 +287,6 @@ module.exports = {
   clearCache,
   importCache,
   exportCache,
+  saveRecords,
   restorePendingQuery
 };

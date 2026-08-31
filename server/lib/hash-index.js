@@ -222,14 +222,29 @@ async function rebuild() {
       let ents = [];
       try { ents = await fs.promises.readdir(dir, { withFileTypes: true }); } catch (_) { return; }
       for (const e of ents) {
-        if (e.name === ".trash" || e.name === ".git" || e.name === "@eaDir" || e.name.startsWith(".")) continue;
+        // 2026-08-31 修复：不再跳过 . 开头目录——.代理人/.NPC 等隐藏仓库区里的旧 HTML
+        //   也存绝对下载路径，重建时必须遍历并替换为相对路径（用户要求：所有 HTML）
+        if (e.name === ".trash" || e.name === ".git" || e.name === "@eaDir") continue;
         const p = path.join(dir, e.name);
         if (e.isDirectory()) {
-          await walk(p);
+          await walk(p, root);
         } else if (e.name === "description.html") {
           const obj = readIndexObj(dir);
           if (obj) {
             htmls++;
+            // ---- 2026-08-31 用户要求：HTML 下载路径以相对路径记录；重建时按 HTML
+            //   当前所在相对路径替换（手动移动文件夹后重建可纠正）----
+            try {
+              const relDir = path.relative(root, dir) || "";
+              const hp = path.join(dir, "description.html");
+              const hStr = fs.readFileSync(hp, "utf8");
+              const hEsc = (s) => String(s == null ? "" : s)
+                .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+              let newH = String(hStr).replace(/下载路径：[^\n<]*/, "下载路径：" + (relDir ? hEsc(relDir) : "-"));
+              // JSON 索引块里的 dir 字段同步为相对路径
+              newH = String(newH).replace(/"dir":\s*"[^"]*"/, '"dir": ' + JSON.stringify(relDir));
+              if (newH !== hStr) fs.writeFileSync(hp, newH, "utf8");
+            } catch (_) {}
             const gbMeta = {
               modId: obj.modId || (obj.url || "").replace(/^.*mods\/(\d+).*$/, "$1") || "",
               modName: obj.name || "",

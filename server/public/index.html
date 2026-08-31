@@ -95,15 +95,21 @@ try {
 
   <!-- ============ 搜索 ============ -->
   <div class="tab-panel" id="panel-search">
+
+    <!-- 2026-08-31 用户要求：关键词搜索 Mod 和 按时间搜索 Mod 合并为一个卡片，共用 游戏选择/普通 NSFW 筛选 -->
     <div class="card">
-      <h2>关键词搜索 Mod</h2>
-      <p class="hint">输入关键词（支持中文/角色名/别号，自动归一到英文，如「桑多涅」「吉约丹小姐」→ Sandrone），结果可勾选批量下载</p>
+      <h2>搜索 Mod</h2>
+      <p class="hint">关键词搜索（中文/角色名/别号，自动归一到英文，如「桑多涅」「吉约丹小姐」→ Sandrone）或按时间搜索（新增/修改/更新任一命中），共用下方游戏与分级筛选</p>
       <div class="row">
         <label>游戏
           <select id="searchGameSelect">
             <option value="">— 请选择游戏 —</option>
           </select>
         </label>
+        <label><input type="checkbox" id="filterNormal" checked> 普通</label>
+        <label><input type="checkbox" id="filterNsfw" checked> NSFW</label>
+      </div>
+      <div class="row mt">
         <label>关键词 <input type="text" id="kwInput" placeholder="如 Sandrone、桑多涅、Lingerie" style="width:240px"></label>
         <div style="position:relative">
           <label>选角色 <input type="text" id="kwRoleInput" placeholder="输入过滤，如 Od → Odette" style="width:150px" disabled autocomplete="off" title="从香蕉网获取该游戏角色列表，选中后自动填入关键词并搜索"></label>
@@ -111,38 +117,28 @@ try {
         </div>
         <button class="primary" id="kwSearchBtn" type="button">搜索</button>
       </div>
-      <div class="status" id="kwStatus"></div>
-    </div>
-
-    <div class="card">
-      <h2>按时间搜索 Mod</h2>
-      <p class="hint">按「新增 / 修改 / 更新」三个时间字段任意命中筛选指定游戏、指定时间范围内的 mod（后台每秒 1 页）</p>
       <div class="row mt">
         <label>开始日期 <input type="date" id="searchStart"></label>
         <button class="ghost" id="earliestBtn" type="button" title="设为最早（2000-01-01，从第一个 mod 开始搜）">最早</button>
         <label>结束日期 <input type="date" id="searchEnd"></label>
-      </div>
-      <div class="row mt">
-        <label><input type="checkbox" id="filterNormal" checked> 普通</label>
-        <label><input type="checkbox" id="filterNsfw" checked> NSFW</label>
-      </div>
-      <div class="row mt">
         <button class="primary" id="searchBtn" type="button">查询 Mod</button>
         <button class="ghost" id="stopSearchBtn" type="button" style="display:none">停止搜索</button>
-        <button class="ghost" id="clearSearchBtn" type="button">清空列表</button>
-        <button class="ghost" id="exportSearchBtn" type="button" title="导出当前搜索记录为 JSON 文件（备份/迁移用）">导出记录</button>
-        <button class="ghost" id="importSearchBtn" type="button" title="上传 JSON 文件导入搜索记录（按 modId 合并，导入覆盖原有）">导入记录</button>
-        <input type="file" id="importSearchFile" accept=".json,application/json" style="display:none">
       </div>
+      <div class="status" id="kwStatus"></div>
       <div class="status" id="searchStatus"></div>
     </div>
 
     <div class="card">
       <h2>搜索结果 <span id="resultCount" class="sub"></span></h2>
       <div class="row" style="margin-bottom:8px">
-        <button class="primary" id="selectAllBtn" type="button">全选</button>
+        <button class="primary" id="selectAllBtn" type="button" title="只勾选符合上方「普通/NSFW 筛选」的结果">全选</button>
         <button class="ghost" id="selectNoneBtn" type="button">全不选</button>
         <button class="success" id="downloadSelectedBtn" type="button">下载勾选项</button>
+        <button class="ghost" id="saveSearchBtn" type="button" title="把当前搜索结果覆盖写入 search_cache.json">保存</button>
+        <button class="ghost" id="clearSearchBtn" type="button">清空列表</button>
+        <button class="ghost" id="exportSearchBtn" type="button" title="导出当前搜索记录为 JSON 文件（备份/迁移用）">导出记录</button>
+        <button class="ghost" id="importSearchBtn" type="button" title="上传 JSON 文件导入搜索记录（按 modId 合并，导入覆盖原有）">导入记录</button>
+        <input type="file" id="importSearchFile" accept=".json,application/json" style="display:none">
       </div>
       <div class="result-list" id="searchResultList"><div class="empty">尚未搜索</div></div>
     </div>
@@ -172,10 +168,12 @@ try {
       </div>
     </div>
 
-    <!-- 2026-08-26 用户要求：文件夹合并放进设置里面 -->
+    <!-- 2026-08-26 用户要求：文件夹合并放进设置里面（2026-08-31 用户要求：调整为卡片第一个小功能标题） -->
     <div class="card">
-      <h2>文件夹合并（按映射重命名角色目录）</h2>
-      <p class="hint">例：文件夹 <b>Sandrone</b> 根据映射重命名为 <b>Sandrone – 桑多涅</b>；同角色已有「英文 – 中文」目录时内容并入，空目录进根目录 .trash（可恢复）</p>
+
+      <!-- 2026-08-31 用户要求：文件夹合并 = 卡片第一个功能（h3 小标题），🔄 重新获取角色 之后换行分隔 -->
+      <h3 style="margin:14px 0 8px;font-size:14px;color:var(--primary)">🔀 文件夹合并（按映射重命名角色目录）</h3>
+      <p class="hint" style="margin:4px 0 8px">例：文件夹 <b>Sandrone</b> 根据映射重命名为 <b>Sandrone – 桑多涅</b>；同角色已有「英文 – 中文」目录时内容并入，空目录进根目录 .trash（可恢复）</p>
       <div class="row">
         <label>游戏
           <select id="mmGameSelect">

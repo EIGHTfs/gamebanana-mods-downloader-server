@@ -412,6 +412,12 @@ const server = http.createServer(async (req, res) => {
       }
       return sendJson(res, 200, search.importCache(records));
     }
+    // 2026-08-31 用户要求：保存搜索结果（把前端当前结果覆盖写入 search_cache.json）
+    if (method === "POST" && pathname === "/api/search/save") {
+      const body = await readBody(req);
+      const results = Array.isArray(body && body.results) ? body.results : [];
+      return sendJson(res, 200, search.saveRecords(results));
+    }
     // 2026-08-26 用户要求：导出搜索记录（当前 cache 完整 JSON，前端下载为文件）
     if (method === "GET" && pathname === "/api/search/export") {
       const cache = search.exportCache();

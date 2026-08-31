@@ -259,7 +259,9 @@ async function genIndexHtml(url) {
     superCategory: mod.superCategory || "",
     warehouse: target.warehouse || "",
     item: target.item || "",
-    dir: target.dir || "",
+    // 2026-08-31 用户要求：HTML 只记录相对路径（相对游戏根），完整路径由
+    //   重建索引时按 HTML 所在相对位置实时计算替换——手动移动文件夹后重建可纠正
+    dir: target.root ? (path.relative(target.root, target.dir) || "") : (target.dir || ""),
     version: mod.version || "",
     dateAdded: mod.dateAdded,
     dateModified: mod.dateModified,
@@ -490,7 +492,11 @@ function moveDirTo(src, dst, trashRoot) {
         const trashDir = trashRoot || path.join(path.dirname(dst), ".trash");
         try {
           fs.mkdirSync(trashDir, { recursive: true });
-          const t = path.join(trashDir, "dup-归位-" + path.basename(src) + "-" + Date.now());
+          // 2026-08-31 用户要求：垃圾桶保留原始目录结构 —— trashDir/<相对根层级>/<原名>，不拍平
+          const tb = path.dirname(trashDir); // trashDir 形如 <根>/.trash → 根
+          let t = path.join(trashDir, path.relative(tb, src));
+          if (fs.existsSync(t)) t = t + "-" + Date.now();
+          fs.mkdirSync(path.dirname(t), { recursive: true });
           fs.renameSync(src, t);
           return { moved: true, files: movedFiles, trashed: t };
         } catch (_) {}
@@ -634,7 +640,15 @@ async function prepareMod(url) {
         const d = path.join(finalDir, e.name);
         if (fs.existsSync(d)) {
           // 目标已有同名 → 移到垃圾桶（重复）
-          try { fs.mkdirSync(trashRoot, { recursive: true }); fs.renameSync(s, path.join(trashRoot, "dup-仓库散落-" + Date.now() + "-" + e.name)); movedList.push(w.relDir + "/" + e.name + "(重复→trash)"); } catch (_) {}
+          try {
+            fs.mkdirSync(trashRoot, { recursive: true });
+            // 2026-08-31 用户要求：垃圾桶保留原始目录结构 —— trashRoot/<仓库相对路径>/<原文件名>
+            let tx = path.join(trashRoot, w.relDir || "", e.name);
+            if (fs.existsSync(tx)) tx = tx + "-" + Date.now();
+            fs.mkdirSync(path.dirname(tx), { recursive: true });
+            fs.renameSync(s, tx);
+            movedList.push(w.relDir + "/" + e.name + "(重复→trash)");
+          } catch (_) {}
         } else {
           try { fs.renameSync(s, d); movedList.push(w.relDir + "/" + e.name); } catch (_) {}
         }

@@ -232,11 +232,31 @@ function bindSearch() {
     }
   });
 
+  // 2026-08-31 用户要求：全选也依据上面搜索功能部分的 普通/NSFW 筛选（只勾选符合筛选的）
   $("#selectAllBtn").addEventListener("click", () => {
-    document.querySelectorAll("#searchResultList input[type=checkbox]").forEach((cb) => (cb.checked = true));
+    const wantNormal = $("#filterNormal").checked;
+    const wantNsfw = $("#filterNsfw").checked;
+    document.querySelectorAll("#searchResultList input[type=checkbox]").forEach((cb) => {
+      const id = cb.id.replace(/^cb-/, "");
+      const it = searchResults.find((x) => String(x.modId) === id);
+      cb.checked = !!it && (it.isNsfw ? wantNsfw : wantNormal);
+    });
   });
   $("#selectNoneBtn").addEventListener("click", () => {
     document.querySelectorAll("#searchResultList input[type=checkbox]").forEach((cb) => (cb.checked = false));
+  });
+
+  // 2026-08-31 用户要求：保存（搜索结果覆盖写入 search_cache.json）
+  $("#saveSearchBtn").addEventListener("click", async () => {
+    try {
+      const r = await api("/api/search/save", "POST", { results: searchResults });
+      if (!r.ok) throw new Error(r.error || "保存失败");
+      $("#searchStatus").textContent = `✅ 已保存 ${r.total} 条到 search_cache.json`;
+      $("#searchStatus").className = "status ok";
+    } catch (e) {
+      $("#searchStatus").textContent = "保存失败: " + e.message;
+      $("#searchStatus").className = "status err";
+    }
   });
 
   $("#downloadSelectedBtn").addEventListener("click", async () => {
@@ -270,10 +290,16 @@ async function keywordSearch() {
       const r = await api("/api/keyword-search?q=" + encodeURIComponent(q) + "&game=" + encodeURIComponent(game) + "&perpage=50&max=100");
       if (!r || !r.ok) throw new Error((r && r.error) || "search failed");
       searchResults = r.results || [];
+      // 2026-08-31 用户要求：关键词搜索也按 普通/NSFW 筛选（与时间搜索共用筛选）
+      const wantNormal = $("#filterNormal") ? $("#filterNormal").checked : true;
+      const wantNsfw = $("#filterNsfw") ? $("#filterNsfw").checked : true;
+      if (!(wantNormal && wantNsfw)) {
+        searchResults = searchResults.filter((it) => (it.isNsfw ? wantNsfw : wantNormal));
+      }
       renderSearchResults();
       if (st) {
         const norm = r.normalized ? `（${r.normalized.from} → ${r.normalized.to}）` : "";
-        st.textContent = `关键词「${q}」${norm}: ${searchResults.length} 个结果`;
+        st.textContent = `关键词「${q}」${norm}: ${searchResults.length} 个结果${(wantNormal && wantNsfw) ? "" : "（已按分级筛选）"}`;
         st.className = "status ok";
       }
       return;

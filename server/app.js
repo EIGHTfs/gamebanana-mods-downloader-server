@@ -473,8 +473,11 @@ const server = http.createServer(async (req, res) => {
           return sendJson(res, 400, { ok: false, error: "目录不存在: " + dir });
         }
         const entries = fs.readdirSync(dir, { withFileTypes: true });
+        // 2026-08-31 修复老 bug（用户原话：「设置目录不显示带.目录」）：
+        //   不再过滤 . 开头目录（.Mods/.代理人/(gamebanana) 深层根需能选到），
+        //   只排除群晖系统目录 @eaDir（缩略图缓存，每个目录都有）、#recycle（回收站）、.git（版本库）
         const dirs = entries
-          .filter((e) => e.isDirectory() && !e.name.startsWith("."))
+          .filter((e) => e.isDirectory() && e.name !== "@eaDir" && e.name !== "#recycle" && e.name !== ".git")
           .map((e) => e.name)
           .sort();
         return sendJson(res, 200, { ok: true, path: dir, parent: dir === "/" ? null : path.dirname(dir), dirs });

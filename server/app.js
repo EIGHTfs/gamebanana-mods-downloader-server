@@ -326,11 +326,23 @@ const server = http.createServer(async (req, res) => {
     //   const data = await gbApi.fetchJson(`https://gamebanana.com/apiv11/Mod/${checkId}/ProfilePage`, {}, 1);
     //   const files = ...; const vis = ...; if (files.length > 0 && vis === "hide") { loggedIn:true } ...
     // }
+    // 2026-09-01 凭证明细（对齐 iwara cred：字符数/项数/各字段有无）——只算元数据，不回传明文
+    function gbCookieCred(raw) {
+      const s0 = String(raw || "").trim();
+      if (!s0) return { cookieChars: 0, cookieItems: 0, hasSess: false, hasRmc: false };
+      const items = s0.split(";").map((x) => x.trim()).filter(Boolean);
+      return {
+        cookieChars: s0.length,
+        cookieItems: items.length,
+        hasSess: items.some((x) => /^sess=/i.test(x)),
+        hasRmc: items.some((x) => /^rmc=/i.test(x))
+      };
+    }
     if (method === "GET" && pathname === "/api/gb-login-status") {
       const cfgNow = cfg.readConfig();
       const cookie = String(cfgNow.gbCookie || "").trim();
       if (!cookie) {
-        return sendJson(res, 200, { ok: true, configured: false, loggedIn: false, cookieSet: false, warnLevel: "err", detail: "未配置 gbCookie" });
+        return sendJson(res, 200, { ok: true, configured: false, loggedIn: false, cookieSet: false, warnLevel: "err", cred: gbCookieCred(""), detail: "未配置 gbCookie" });
       }
       try {
         // 2026-09-01 用带响应头的 fetch：解析 Set-Cookie 里 rmc 的 Expires 算剩余天数（参照 iwara 的 /api/account-check）
@@ -349,6 +361,7 @@ const server = http.createServer(async (req, res) => {
         if (!loggedIn) {
           return sendJson(res, 200, { ok: true, configured: true, loggedIn: false, cookieSet: true,
             expiresAt, remainingDays, warnLevel: remainingDays !== null && remainingDays < 0 ? "expired" : "err",
+            cred: gbCookieCred(cookie),
             detail: "未登录（会话失效或 Cookie 不完整；GameBanana 会话含 HttpOnly cookie，需用浏览器 DevTools 或油猴 GM_cookie 复制完整 Cookie）" });
         }
         const idRow = uicfg._idMemberRow || 0;
@@ -366,9 +379,10 @@ const server = http.createServer(async (req, res) => {
         const dayTxt = remainingDays !== null ? `，剩 ${remainingDays} 天` : "";
         return sendJson(res, 200, { ok: true, configured: true, loggedIn: true, cookieSet: true,
           username, idRow, profileUrl, expiresAt, remainingDays, warnLevel,
+          cred: gbCookieCred(cookie),
           detail: username ? `已登录：${username}${dayTxt}` : `已登录（用户 id ${idRow}）` });
       } catch (e) {
-        return sendJson(res, 200, { ok: true, configured: true, loggedIn: false, cookieSet: true, warnLevel: "err", detail: "检测失败: " + (e.message || String(e)) });
+        return sendJson(res, 200, { ok: true, configured: true, loggedIn: false, cookieSet: true, warnLevel: "err", cred: gbCookieCred(cookie), detail: "检测失败: " + (e.message || String(e)) });
       }
     }
 
@@ -671,7 +685,9 @@ const server = http.createServer(async (req, res) => {
         if (err) return sendJson(res, 404, { ok: false, error: "油猴脚本不存在" });
         res.writeHead(200, {
           "Content-Type": "text/javascript; charset=utf-8",
-          "Content-Disposition": "attachment; filename=gamebanana-cookie-userscript.user.js",
+          // 2026-09-01 用户指出：iwara 直接触发油猴安装/更新，gbmd 却弹下载——根因是 attachment 强制下载。
+          // 改 inline：浏览器直接把 .user.js 当脚本打开 → Tampermonkey/Violentmonkey 自动弹安装/更新。
+          "Content-Disposition": "inline; filename=gamebanana-cookie-userscript.user.js",
           "Cache-Control": "no-store"
         });
         res.end(data);

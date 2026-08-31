@@ -48,6 +48,7 @@ docs/ui-template/
 ├── setup.html        首次设置页（纯前端演示用）
 ├── style.css         全部样式（含白天/夜间主题变量）
 ├── favicon.png       浏览器标签页图标（72px，照搬香蕉网官方香蕉 logo，非自绘）
+├── favicon.ico       浏览器标签页图标（16px，必须 200——Chrome 标签页图标依赖它）
 ├── app.js            前端交互逻辑（模板版，已去后端耦合）
 ├── mock-api.js       ★ 模拟后端层：全局 api() + fetch 接管 + 接口契约注释
 ├── template-runtime-check.js   验证脚本（fake-DOM 跑 init，确认无未捕获异常）
@@ -131,7 +132,7 @@ docs/ui-template/
 | ⬇ 下载 | 批量链接提交、清空 | `/api/download` |
 | 📊 下载进度 | 任务轮询、暂停/继续/停止、重试/跳过、并发数、找回模式 | `/api/task*`, `/api/skip*` |
 | 🔍 搜索 | 时间+分级筛选搜索、关键词搜索、角色下拉、全选/保存/导入导出 | `/api/search*`, `/api/keyword-search`, `/api/gb-characters` |
-| ⚙ 设置 | 游戏映射增删、香蕉网登录状态、改密码、数据备份 zip 导入导出、hash 三表查询/重建、角色映射合并/清空 | `/api/games`, `/api/settings`, `/api/gb-*`, `/api/hash*`, `/api/merge-roles`, `/api/cleanup-empty-dirs`, `/api/data/*` |
+| ⚙ 设置 | 游戏映射增删、香蕉网登录状态（检测=多行块：用户名/用户id/主页/剩余天数/凭证明细）、改密码、数据备份 zip 导入导出、hash 三表查询/重建、角色映射合并/清空 | `/api/games`, `/api/settings`, `/api/gb-*`, `/api/hash*`, `/api/merge-roles`, `/api/cleanup-empty-dirs`, `/api/data/*` |
 
 ---
 
@@ -152,7 +153,47 @@ docs/ui-template/
 
 ---
 
-## 九、已知取舍
+## 九、检测登录状态 & 油猴脚本输出规范（2026-09-01 对齐 iwara 改法）
+
+### 设置页「检测登录状态」（多行块）
+- 点按钮 → `GET /api/gb-login-status`（需登录 session）→ 渲染进
+  `<pre id="gbLoginStatus" class="login-detect">`，三态配色 `.ok/.warn/.err`。
+- 多行格式（与油猴面板同一套）：
+  ```
+  ✅ 已登录（剩 61 天）
+  👤 用户名: fluquor
+  🆔 用户 id: 2330203
+  🔗 https://gamebanana.com/members/2330203
+  ───
+  完整 Cookie: 125 字符 / 2 项 ｜ 存于服务器（不回传明文）
+  含 sess: ✅ 有
+  含 rmc: ✅ 有
+  ```
+- 后端返回契约（`mock-api.js` 已同步）：`{ ok, loggedIn, configured, cookieSet,
+  username?, idRow?, profileUrl?, expiresAt?, remainingDays?, warnLevel?(ok|warn|expired),
+  cred?{ cookieChars, cookieItems, hasSess, hasRmc }, detail? }`。
+- `remainingDays` 来自服务器解析 GameBanana **rmc 的 Expires**（sess 是会话 cookie 无到期）；
+  剩 ≤7 天 → warn（⚠️），<0 → expired（❌）。
+
+### 顶栏用户名徽章（三态）
+- `#gbUserBadge`：未配置凭证→「未配置凭证」(err)；已登录→「👤 用户名 · 剩 N 天」(ok，
+  剩≤7天转 ⚠️ warn)；过期→「❌ 已过期」(err)。夜间模式单独配色。
+
+### 油猴脚本输出（浏览器直接触发安装/更新）
+- 服务器输出 `.user.js` 时 **必须 `Content-Disposition: inline`**（不是 attachment）：
+  ```
+  Content-Type: text/javascript; charset=utf-8
+  Content-Disposition: inline; filename=xxx.user.js
+  Cache-Control: no-store
+  ```
+  `attachment` 会强制浏览器下载文件（用户看到「弹下载」），`inline` 让浏览器直接打开
+  → Tampermonkey/Violentmonkey 自动弹安装/更新。
+- 脚本 `@name`/`@version` 每次升级都要变，油猴才认「有更新」；模板里只演示前端，
+  油猴脚本本体在项目根 `scripts/gamebanana-cookie-userscript.user.js`（SA6400 同源）。
+
+---
+
+## 十、已知取舍
 
 - 模板的登录页/设置页点按钮会「模拟成功」，但不会真正改变任何东西。
 - 导出按钮会下载一个占位文件（内容为 mock 占位字符串），并非真实数据。

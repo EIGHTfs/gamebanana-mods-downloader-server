@@ -184,11 +184,14 @@ const MOCK_ROUTES = [
         const expiresAt = Date.now() + 29 * 86400000;
         return { ok: true, configured: true, loggedIn: true, username: "demo_user", idRow: 2330203,
           profileUrl: "https://gamebanana.com/members/2330203", cookieSet: true,
-          expiresAt, remainingDays: 29, warnLevel: "ok", detail: "已登录：demo_user，剩 29 天" };
+          expiresAt, remainingDays: 29, warnLevel: "ok",
+          cred: { cookieChars: 125, cookieItems: 2, hasSess: true, hasRmc: true },
+          detail: "已登录：demo_user，剩 29 天" };
       }
-      return { ok: true, loggedIn: false, configured: false, cookieSet: false, warnLevel: "err", detail: "未配置 gbCookie" };
+      return { ok: true, loggedIn: false, configured: false, cookieSet: false, warnLevel: "err",
+        cred: { cookieChars: 0, cookieItems: 0, hasSess: false, hasRmc: false }, detail: "未配置 gbCookie" };
     },
-    note: "真实返回：{ ok, loggedIn, configured, cookieSet, username?, idRow?, profileUrl?, expiresAt?, remainingDays?, warnLevel?(ok/warn/expired), detail? }",
+    note: "真实返回：{ ok, loggedIn, configured, cookieSet, username?, idRow?, profileUrl?, expiresAt?, remainingDays?, warnLevel?(ok/warn/expired), cred?{cookieChars,cookieItems,hasSess,hasRmc}, detail? }",
   },
   {
     match: (p) => p.startsWith("/api/gb-game-info"),

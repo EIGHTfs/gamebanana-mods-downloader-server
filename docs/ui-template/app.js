@@ -933,7 +933,8 @@ function bindSettings() {
     }
   });
 
-  $("#gbLoginCheckBtn").addEventListener("click", checkGbLoginStatus);
+  const gbLoginBtn = $("#gbLoginCheckBtn");
+  if (gbLoginBtn) gbLoginBtn.addEventListener("click", checkGbLoginStatus);
   checkGbLoginStatus();
 
   $("#changePwdBtn").addEventListener("click", async () => {
@@ -1143,28 +1144,46 @@ function bindSettings() {
   if (hsi) hsi.addEventListener("keydown", (e) => { if (e.key === "Enter") hashSearch(); });
 }
 
+// 2026-09-01 参照 iwara /api/account-check：设置页检测登录状态改为多行块（与油猴面板同一套格式）
+function fmtGbLoginBlock(r) {
+  if (!r) return "❌ 检测失败：无响应";
+  const L = [];
+  if (r.loggedIn) {
+    const days = r.remainingDays !== null && r.remainingDays !== undefined ? `（剩 ${r.remainingDays} 天）` : "";
+    L.push(`✅ 已登录${days}`);
+    L.push(`👤 用户名: ${r.username || "-"}`);
+    L.push(`🆔 用户 id: ${r.idRow || "-"}`);
+    if (r.profileUrl) L.push(`🔗 ${r.profileUrl}`);
+  } else if (r.configured === false) {
+    L.push("○ 未配置凭证");
+    L.push("浏览器登录 gamebanana.com 后，用油猴脚本复制完整 Cookie（含 HttpOnly）粘贴上方输入框");
+  } else if (r.warnLevel === "expired") {
+    L.push("❌ 已过期");
+    L.push(r.detail || "Cookie 已过期，请重新复制");
+  } else {
+    L.push("❌ 未登录");
+    L.push(r.detail || "Cookie 不完整或会话失效");
+  }
+  L.push("───");
+  L.push("完整 Cookie 存于服务器（不回传明文）");
+  if (r.remainingDays !== null && r.remainingDays !== undefined) L.push(`失效日期: ${new Date(r.expiresAt).toISOString().slice(0,10)}（剩 ${r.remainingDays} 天）`);
+  return L.join("\n");
+}
 async function checkGbLoginStatus() {
   const el = $("#gbLoginStatus");
   const btn = $("#gbLoginCheckBtn");
   if (!el) return;
-  el.className = "status";
+  el.className = "login-detect";
   el.textContent = "检测中…";
   if (btn) btn.disabled = true;
   try {
     const r = await api("/api/gb-login-status");
-    if (r && r.ok && r.loggedIn) {
-      el.textContent = `✅ ${r.detail || "已登录"}`;
-      el.className = "status ok";
-    } else if (r && r.ok && r.configured) {
-      el.textContent = `⚠️ ${r.detail || "未登录"}`;
-      el.className = "status err";
-    } else {
-      el.textContent = "○ 未配置 gbCookie（浏览器登录 gamebanana.com 后复制完整 cookie）";
-      el.className = "status";
-    }
+    el.textContent = fmtGbLoginBlock(r);
+    const st = (r && r.warnLevel === "ok") ? "ok" : ((r && r.warnLevel === "warn") ? "warn" : "err");
+    el.className = "login-detect " + st;
   } catch (e) {
-    el.textContent = "检测失败: " + (e.message || String(e));
-    el.className = "status err";
+    el.textContent = "❌ 检测失败: " + (e.message || String(e));
+    el.className = "login-detect err";
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -1177,9 +1196,15 @@ async function updateGbUserBadge() {
   try {
     const r = await api("/api/gb-login-status");
     if (r && r.ok && r.loggedIn && r.username) {
-      el.textContent = `👤 ${r.username}`;
+      const days = (r.remainingDays !== null && r.remainingDays !== undefined) ? ` · 剩 ${r.remainingDays} 天` : "";
+      const icon = r.warnLevel === "warn" ? "⚠️" : "👤";
+      el.textContent = `${icon} ${r.username}${days}`;
       el.title = r.profileUrl || "GameBanana 已登录用户";
-      el.className = "sub gb-user-ok";
+      el.className = "sub gb-user-" + (r.warnLevel === "ok" ? "ok" : (r.warnLevel === "warn" ? "warn" : "err"));
+    } else if (r && r.warnLevel === "expired") {
+      el.textContent = "❌ 已过期";
+      el.title = (r && r.detail) || "GameBanana Cookie 已过期，请重新复制";
+      el.className = "sub gb-user-err";
     } else {
       el.textContent = "";
       el.title = "";

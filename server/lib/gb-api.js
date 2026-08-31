@@ -18,6 +18,12 @@ function configCookie() {
 }
 
 async function fetchJson(url, opts = {}, retries = 3) {
+  const r = await fetchJsonHeaders(url, opts, retries);
+  return r.json;
+}
+
+// 2026-09-01 带响应头的 fetch（解析 Set-Cookie 拿 rmc 过期时间等）。返回 { json, setCookies: [] }。
+async function fetchJsonHeaders(url, opts = {}, retries = 3) {
   // 2026-09-01 UA 改为读 config 的 gbUserAgent（默认 Edge）——GameBanana 会话绑定登录浏览器 UA，
   // 用普通 Chrome UA 会被判定为未登录；此 UA 同时用于登录检测与 NSFW 下载。
   const configUa = String(cfg.readConfig().gbUserAgent || "").trim();
@@ -27,6 +33,7 @@ async function fetchJson(url, opts = {}, retries = 3) {
   }, opts.headers || {});
   const cookie = opts.cookie !== undefined ? opts.cookie : configCookie();
   if (cookie) headers.Cookie = cookie;
+  let setCookies = [];
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), opts.timeoutMs || 30000);
@@ -39,7 +46,8 @@ async function fetchJson(url, opts = {}, retries = 3) {
     try {
       const resp = await fetch(url, { headers, signal: controller.signal, redirect: "follow" });
       if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
-      return await resp.json();
+      try { setCookies = resp.headers.getSetCookie ? resp.headers.getSetCookie() : []; } catch (_) {}
+      return { json: await resp.json(), setCookies };
     } catch (e) {
       if (e.name === "AbortError") throw e;
       const netErr = e instanceof TypeError || /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|EPIPE|socket hang up/i.test(String(e.message || ""));
@@ -481,6 +489,7 @@ async function fetchGameInfo(gameId) {
 module.exports = {
   API_BASE,
   fetchJson,
+  fetchJsonHeaders,
   extractModId,
   parseProfile,
   resolveMod,

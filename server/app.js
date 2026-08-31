@@ -330,13 +330,26 @@ const server = http.createServer(async (req, res) => {
       const cfgNow = cfg.readConfig();
       const cookie = String(cfgNow.gbCookie || "").trim();
       if (!cookie) {
-        return sendJson(res, 200, { ok: true, configured: false, loggedIn: false, detail: "未配置 gbCookie" });
+        return sendJson(res, 200, { ok: true, configured: false, loggedIn: false, cookieSet: false, warnLevel: "err", detail: "未配置 gbCookie" });
       }
       try {
-        const uicfg = await gbApi.fetchJson("https://gamebanana.com/apiv13/Member/UiConfig?_sUrl=%2F", {}, 1);
+        // 2026-09-01 用带响应头的 fetch：解析 Set-Cookie 里 rmc 的 Expires 算剩余天数（参照 iwara 的 /api/account-check）
+        const { json: uicfg, setCookies } = await gbApi.fetchJsonHeaders("https://gamebanana.com/apiv13/Member/UiConfig?_sUrl=%2F", {}, 1);
         const loggedIn = !!(uicfg && uicfg._bIsLoggedIn);
+        // rmc = remember-me cookie，服务端每次请求会刷新并带 Expires；sess 是会话 cookie 无固定到期
+        let expiresAt = 0;
+        let remainingDays = null;
+        for (const sc of setCookies || []) {
+          const m = /^rmc=/i.test(String(sc)) ? sc.match(/Expires=([^;]+)/i) : null;
+          if (m) {
+            const t = Date.parse(m[1]);
+            if (!isNaN(t)) { expiresAt = t; remainingDays = Math.ceil((t - Date.now()) / 86400000); }
+          }
+        }
         if (!loggedIn) {
-          return sendJson(res, 200, { ok: true, configured: true, loggedIn: false, detail: "未登录（会话失效或 Cookie 不完整；GameBanana 会话含 HttpOnly cookie，需用浏览器 DevTools 或油猴 GM_cookie 复制完整 Cookie）" });
+          return sendJson(res, 200, { ok: true, configured: true, loggedIn: false, cookieSet: true,
+            expiresAt, remainingDays, warnLevel: remainingDays !== null && remainingDays < 0 ? "expired" : "err",
+            detail: "未登录（会话失效或 Cookie 不完整；GameBanana 会话含 HttpOnly cookie，需用浏览器 DevTools 或油猴 GM_cookie 复制完整 Cookie）" });
         }
         const idRow = uicfg._idMemberRow || 0;
         let username = "";
@@ -348,9 +361,14 @@ const server = http.createServer(async (req, res) => {
             profileUrl = (prof && prof._sProfileUrl) || "";
           } catch (_) {}
         }
-        return sendJson(res, 200, { ok: true, configured: true, loggedIn: true, username, idRow, profileUrl, detail: username ? `已登录：${username}` : `已登录（用户 id ${idRow}）` });
+        // warnLevel：剩 ≤7 天 → warn；已过期 → expired；否则 ok
+        const warnLevel = remainingDays !== null && remainingDays < 0 ? "expired" : (remainingDays !== null && remainingDays <= 7 ? "warn" : "ok");
+        const dayTxt = remainingDays !== null ? `，剩 ${remainingDays} 天` : "";
+        return sendJson(res, 200, { ok: true, configured: true, loggedIn: true, cookieSet: true,
+          username, idRow, profileUrl, expiresAt, remainingDays, warnLevel,
+          detail: username ? `已登录：${username}${dayTxt}` : `已登录（用户 id ${idRow}）` });
       } catch (e) {
-        return sendJson(res, 200, { ok: true, configured: true, loggedIn: false, detail: "检测失败: " + (e.message || String(e)) });
+        return sendJson(res, 200, { ok: true, configured: true, loggedIn: false, cookieSet: true, warnLevel: "err", detail: "检测失败: " + (e.message || String(e)) });
       }
     }
 
@@ -511,15 +529,25 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- 下载（四步流程：生成HTML → 查重归位 → 整理 → 正式下载）----
-    if (method === "POST" && pathname === "/api/download") {
+    // 2026-09-01 参照 iwara：/api/receive 为油猴脚本专用接收口，规整 { url }/ { links } 后走同一套下载
+    if (method === "POST" && (pathname === "/api/download" || pathname === "/api/receive")) {
       const body = await readBody(req);
       // 支持完整链接或纯数字 id
-      const links = (body.links || [])
+      let raw = body.links || [];
+      if (pathname === "/api/receive") {
+        if (typeof body.url === "string") raw = [body.url];
+        else if (Array.isArray(body.urls)) raw = body.urls;
+        else if (typeof body.text === "string") raw = body.text.split(/\r?\n/);
+        else if (typeof raw === "string") raw = [raw];
+      }
+      const links = (raw || [])
         .map((s) => String(s).trim())
         .filter((s) => s && (s.includes("gamebanana.com") || /^\d+$/.test(s)));
       if (!links.length) return sendJson(res, 400, { ok: false, error: "没有有效的链接" });
       const t = await downloader.startDownloadTask({ mods: links.map((l) => ({ profileUrl: l })) });
-      return sendJson(res, 200, { ok: true, started: true, task: t });
+      const out = { ok: true, started: true, task: t };
+      if (pathname === "/api/receive") out.received = links.length;
+      return sendJson(res, 200, out);
     }
     if (method === "POST" && pathname === "/api/download-selected") {
       const body = await readBody(req);

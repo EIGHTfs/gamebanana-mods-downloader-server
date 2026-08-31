@@ -181,11 +181,14 @@ const MOCK_ROUTES = [
     get: () => {
       // 模板演示：mock 里配置了 gbCookie 就假装已登录（用户名演示值）
       if (mockState.gbCookie) {
-        return { ok: true, configured: true, loggedIn: true, username: "demo_user", idRow: 2330203, profileUrl: "https://gamebanana.com/members/2330203", detail: "已登录：demo_user" };
+        const expiresAt = Date.now() + 29 * 86400000;
+        return { ok: true, configured: true, loggedIn: true, username: "demo_user", idRow: 2330203,
+          profileUrl: "https://gamebanana.com/members/2330203", cookieSet: true,
+          expiresAt, remainingDays: 29, warnLevel: "ok", detail: "已登录：demo_user，剩 29 天" };
       }
-      return { ok: true, loggedIn: false, configured: false, detail: "未配置 gbCookie" };
+      return { ok: true, loggedIn: false, configured: false, cookieSet: false, warnLevel: "err", detail: "未配置 gbCookie" };
     },
-    note: "真实返回：{ ok, loggedIn, configured, username?, idRow?, profileUrl?, detail? }",
+    note: "真实返回：{ ok, loggedIn, configured, cookieSet, username?, idRow?, profileUrl?, expiresAt?, remainingDays?, warnLevel?(ok/warn/expired), detail? }",
   },
   {
     match: (p) => p.startsWith("/api/gb-game-info"),

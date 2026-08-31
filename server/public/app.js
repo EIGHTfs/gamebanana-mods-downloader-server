@@ -1175,9 +1175,15 @@ async function updateGbUserBadge() {
   try {
     const r = await api("/api/gb-login-status");
     if (r && r.ok && r.loggedIn && r.username) {
-      el.textContent = `👤 ${r.username}`;
+      const days = (r.remainingDays !== null && r.remainingDays !== undefined) ? ` · 剩 ${r.remainingDays} 天` : "";
+      const icon = r.warnLevel === "warn" ? "⚠️" : "👤";
+      el.textContent = `${icon} ${r.username}${days}`;
       el.title = r.profileUrl || "GameBanana 已登录用户";
-      el.className = "sub gb-user-ok";
+      el.className = "sub gb-user-" + (r.warnLevel === "ok" ? "ok" : (r.warnLevel === "warn" ? "warn" : "err"));
+    } else if (r && r.warnLevel === "expired") {
+      el.textContent = "❌ 已过期";
+      el.title = (r && r.detail) || "GameBanana Cookie 已过期，请重新复制";
+      el.className = "sub gb-user-err";
     } else {
       el.textContent = "";
       el.title = "";

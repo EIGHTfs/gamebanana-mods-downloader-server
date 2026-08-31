@@ -917,8 +917,16 @@ function bindSettings() {
       const r = await api("/api/settings", "POST", payload);
       if (!r.ok) throw new Error(r.error || "保存失败");
       settings = r.settings;
+      // 2026-09-01 参照 iwara：保存后清空输入框 + 改 placeholder + 已保存提示，用户不会困惑
+      const cookieEl = $("#gbCookie");
+      if (cookieEl) {
+        cookieEl.value = "";
+        cookieEl.placeholder = "已保存（再贴新凭证才会覆盖；留空不改）";
+        cookieEl.dataset.filled = "1";
+      }
       $("#settingsStatus").textContent = "已保存";
       $("#settingsStatus").className = "status ok";
+      updateGbUserBadge();
     } catch (e) {
       $("#settingsStatus").textContent = "保存失败：" + e.message;
       $("#settingsStatus").className = "status err";
@@ -1162,12 +1170,39 @@ async function checkGbLoginStatus() {
   }
 }
 
+// 2026-09-01 用户要求：顶部时间前面显示当前登录的用户名（复用 /api/gb-login-status 的 username）
+async function updateGbUserBadge() {
+  const el = $("#gbUserBadge");
+  if (!el) return;
+  try {
+    const r = await api("/api/gb-login-status");
+    if (r && r.ok && r.loggedIn && r.username) {
+      el.textContent = `👤 ${r.username}`;
+      el.title = r.profileUrl || "GameBanana 已登录用户";
+      el.className = "sub gb-user-ok";
+    } else {
+      el.textContent = "";
+      el.title = "";
+      el.className = "sub";
+    }
+  } catch (_) {
+    el.textContent = "";
+    el.className = "sub";
+  }
+}
+
 async function loadSettings() {
   try {
     const r = await api("/api/settings");
     settings = r.settings;
     // 2026-08-26 用户要求：设置里不要并发数（只在「下载进度」页改）——不再回填 dlConcurrency
-    $("#gbCookie").value = settings.gbCookie || "";
+    // 2026-09-01 后端脱敏：不回传 gbCookie 明文，改用 hasGbCookie 提示 + dataset.filled 只填一次
+    const cookieEl = $("#gbCookie");
+    if (cookieEl && cookieEl.dataset.filled !== "1" && !cookieEl.value.trim()) {
+      cookieEl.placeholder = settings.hasGbCookie
+        ? "已保存 Cookie（再贴新凭证才会覆盖；留空不改）"
+        : "粘贴 Cookie 后点保存（sess=xxx; rmc=xxx）";
+    }
   } catch (_) {}
   try {
     const g = await api("/api/games");
@@ -1417,6 +1452,7 @@ async function init() {
   } catch (_) {}
   loadGameSelects();
   await loadSettings();
+  updateGbUserBadge(); // 2026-09-01 顶部显示当前登录用户名（时间前）
   try {
     // 2026-08-26 恢复显示最近一次搜索结果（用户要求：重启后恢复显示，不被覆盖）
     const c = await api("/api/search/cache");

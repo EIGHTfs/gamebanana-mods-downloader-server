@@ -21,6 +21,9 @@ const DEFAULT_CONFIG = {
   passwordSalt: "",
   // GameBanana 登录 cookie（NSFW/需登录文件下载用），手动从浏览器抓取填入
   gbCookie: "",
+  // 2026-09-01 用户发现：GameBanana 会话绑定创建会话时的浏览器 UA（必须带 Edg/ 等标识才识别）。
+  // 用户用 Edge 登录 → 默认 Edge UA；换了浏览器登录请同步改这里。
+  gbUserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0",
   // 会话超时（小时），到期需重新登录
   sessionHours: 72,
   // 并发下载数

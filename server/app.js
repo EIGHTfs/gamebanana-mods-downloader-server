@@ -99,6 +99,30 @@ function serveStatic(req, res, pathname) {
   });
 }
 
+// 解析油猴/手填的组合文本：形如
+//   Cookie=xxx; yyy
+// （多行，某行以 Cookie= 开头）。非组合文本返回 null。
+function parseCredentialText(text) {
+  if (typeof text !== "string" || !text.trim()) return null;
+  const get = (key) => {
+    const m = text.split(/\r?\n/).find((l) => l.startsWith(key + "="));
+    if (!m) return null;
+    return m.slice(key.length + 1).trim() || "";
+  };
+  const cookie = get("Cookie");
+  const hit = /(^|\n)(Cookie)=/.test("\n" + text);
+  if (!hit) return null; // 不是组合文本
+  return { cookie: cookie === null ? null : cookie };
+}
+
+// 脱敏：不回传密码哈希/盐与 gbCookie 明文，用 hasGbCookie 表示是否已配置
+function publicSettings(c) {
+  const { passwordHash, passwordSalt, gbCookie, ...safe } = c;
+  return Object.assign({}, safe, {
+    hasGbCookie: !!(gbCookie && String(gbCookie).trim())
+  });
+}
+
 // ---------- 路由 ----------
 const server = http.createServer(async (req, res) => {
   const parsed = urlMod.parse(req.url, true);
@@ -139,20 +163,33 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- 设置（config.json：gbCookie/并发/会话时长；下载路径在 /api/games）----
+    // 2026-09-01 参照 iwara-downloader-server：设置接口脱敏（不回传 gbCookie 明文）、
+    // 敏感字段空串跳过不覆盖（留空 = 不改）、支持油猴/手填的「Cookie=...」组合文本。
+    // 旧实现（直接回传含明文 cookie 的 settings，空串会覆盖已有值）已弃用，保留注释：
+    //   GET  /api/settings → { ok, settings: safe }（含 gbCookie 明文）
+    //   POST /api/settings → 空串也直接写入 cfgNow[k]（会清空已有 cookie）
     if (method === "GET" && pathname === "/api/settings") {
-      const cfgNow = cfg.readConfig();
-      const { passwordHash, passwordSalt, ...safe } = cfgNow;
-      return sendJson(res, 200, { ok: true, settings: safe });
+      return sendJson(res, 200, { ok: true, settings: publicSettings(cfg.readConfig()) });
     }
     if (method === "POST" && pathname === "/api/settings") {
       const body = await readBody(req);
       const cfgNow = cfg.readConfig();
+      // 兼容油猴脚本自动复制的组合文本（多行 Cookie=...）
+      if (typeof body.gbCookie === "string") {
+        const parsed = parseCredentialText(body.gbCookie);
+        if (parsed) {
+          if (parsed.cookie) body.gbCookie = parsed.cookie; // 非空才写，避免空值覆盖
+        }
+      }
       const allowed = ["gbCookie", "downloadConcurrency", "sessionHours", "port"];
       for (const k of allowed) {
-        if (body[k] !== undefined) cfgNow[k] = body[k];
+        if (body[k] === undefined) continue;
+        // 敏感字段（gbCookie）为空串时跳过不覆盖：留空 = 不改
+        if (k === "gbCookie" && String(body[k]).trim() === "") continue;
+        cfgNow[k] = body[k];
       }
       cfg.writeConfig(cfgNow);
-      return sendJson(res, 200, { ok: true, settings: cfgNow });
+      return sendJson(res, 200, { ok: true, settings: publicSettings(cfg.readConfig()) });
     }
     if (method === "POST" && pathname === "/api/change-password") {
       const body = await readBody(req);
@@ -279,9 +316,16 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    // ---- GameBanana 登录状态检测（保留旧实现方法）----
-    // /me 对登录与否都 301 → 改用「拉一个 NSFW/私密 mod（默认 708465，hide 可见性）
-    // 的 ProfilePage，能拿到 _aFiles 且 _sInitialVisibility=hide = 已登录」；未登录拉不到
+    // ---- GameBanana 登录状态检测 ----
+    // 2026-09-01 改用官方前端真实会话端点 apiv13（从官方前端 JS 反编译确认）：
+    //   GET /apiv13/Member/UiConfig?_sUrl=%2F  →  _bIsLoggedIn（是否登录）、_idMemberRow（当前用户 id）
+    //   GET /apiv13/Member/{id}/ProfilePage    →  _sName（用户名）、_sProfileUrl
+    // 旧实现（拉 NSFW mod 708465 判 _aFiles+_sInitialVisibility=hide）实测匿名也拉得到，会误判，已弃用：
+    // if (method === "GET" && pathname === "/api/gb-login-status") {
+    //   ... const checkId = parseInt(cfgNow.gbCheckModId, 10) || 708465;
+    //   const data = await gbApi.fetchJson(`https://gamebanana.com/apiv11/Mod/${checkId}/ProfilePage`, {}, 1);
+    //   const files = ...; const vis = ...; if (files.length > 0 && vis === "hide") { loggedIn:true } ...
+    // }
     if (method === "GET" && pathname === "/api/gb-login-status") {
       const cfgNow = cfg.readConfig();
       const cookie = String(cfgNow.gbCookie || "").trim();
@@ -289,14 +333,22 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { ok: true, configured: false, loggedIn: false, detail: "未配置 gbCookie" });
       }
       try {
-        const checkId = parseInt(cfgNow.gbCheckModId, 10) || 708465;
-        const data = await gbApi.fetchJson(`https://gamebanana.com/apiv11/Mod/${checkId}/ProfilePage`, {}, 1);
-        const files = (data && Array.isArray(data._aFiles)) ? data._aFiles : [];
-        const vis = data && data._sInitialVisibility;
-        if (files.length > 0 && vis === "hide") {
-          return sendJson(res, 200, { ok: true, configured: true, loggedIn: true, detail: `已登录（NSFW mod ${checkId} 文件列表可拉取：${files.length} 个文件）` });
+        const uicfg = await gbApi.fetchJson("https://gamebanana.com/apiv13/Member/UiConfig?_sUrl=%2F", {}, 1);
+        const loggedIn = !!(uicfg && uicfg._bIsLoggedIn);
+        if (!loggedIn) {
+          return sendJson(res, 200, { ok: true, configured: true, loggedIn: false, detail: "未登录（会话失效或 Cookie 不完整；GameBanana 会话含 HttpOnly cookie，需用浏览器 DevTools 或油猴 GM_cookie 复制完整 Cookie）" });
         }
-        return sendJson(res, 200, { ok: true, configured: true, loggedIn: false, detail: "未登录（NSFW mod 文件列表拉不到）" });
+        const idRow = uicfg._idMemberRow || 0;
+        let username = "";
+        let profileUrl = "";
+        if (idRow) {
+          try {
+            const prof = await gbApi.fetchJson(`https://gamebanana.com/apiv13/Member/${idRow}/ProfilePage`, {}, 1);
+            username = (prof && prof._sName) || "";
+            profileUrl = (prof && prof._sProfileUrl) || "";
+          } catch (_) {}
+        }
+        return sendJson(res, 200, { ok: true, configured: true, loggedIn: true, username, idRow, profileUrl, detail: username ? `已登录：${username}` : `已登录（用户 id ${idRow}）` });
       } catch (e) {
         return sendJson(res, 200, { ok: true, configured: true, loggedIn: false, detail: "检测失败: " + (e.message || String(e)) });
       }

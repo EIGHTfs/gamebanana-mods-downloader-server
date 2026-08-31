@@ -53,6 +53,8 @@ header {
 header h1 { margin: 0; font-size: 20px; }
 .sub { color: var(--muted); font-size: 12px; }
 .right { display: flex; align-items: center; gap: 12px; }
+/* 2026-09-01 顶部当前登录用户名（时间前） */
+#gbUserBadge.gb-user-ok { color: var(--ok, #2e8b57); font-weight: 600; }
 .container { max-width: 1080px; margin: 0 auto; padding: 16px; }
 .tabs {
   display: flex;

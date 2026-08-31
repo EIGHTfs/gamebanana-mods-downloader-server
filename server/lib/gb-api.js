@@ -18,9 +18,12 @@ function configCookie() {
 }
 
 async function fetchJson(url, opts = {}, retries = 3) {
+  // 2026-09-01 UA 改为读 config 的 gbUserAgent（默认 Edge）——GameBanana 会话绑定登录浏览器 UA，
+  // 用普通 Chrome UA 会被判定为未登录；此 UA 同时用于登录检测与 NSFW 下载。
+  const configUa = String(cfg.readConfig().gbUserAgent || "").trim();
   const headers = Object.assign({
     Accept: "application/json",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    "User-Agent": configUa || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
   }, opts.headers || {});
   const cookie = opts.cookie !== undefined ? opts.cookie : configCookie();
   if (cookie) headers.Cookie = cookie;

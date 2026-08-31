@@ -82,6 +82,28 @@ vm.runInContext(`
   };
 `, ctx);
 
+// 2026-09-01 断言：settings「POST 保存 → GET 读回」不回退 + 脱敏（覆盖用户报的『点保存读旧值』bug）
+vm.runInContext(`
+  (async () => {
+    const r0 = await api("/api/settings");
+    if (r0.ok && r0.settings && "gbCookie" in r0.settings) {
+      throw new Error("settings GET 不应回传 gbCookie 明文（应脱敏为 hasGbCookie）");
+    }
+    const saved = await api("/api/settings", "POST", { gbCookie: "sess=abc123; rmc=def456" });
+    if (!(saved.ok && saved.settings && saved.settings.hasGbCookie === true)) {
+      throw new Error("POST 保存后 settings 应 hasGbCookie=true（脱敏标志）");
+    }
+    const r2 = await api("/api/settings");
+    if (!(r2.settings && r2.settings.hasGbCookie === true)) {
+      throw new Error("POST 保存后 GET 读回应仍 hasGbCookie=true（不读回旧值/不回退）");
+    }
+    if ("gbCookie" in r2.settings) {
+      throw new Error("GET 读回仍不应含 gbCookie 明文");
+    }
+    window.__settingsOk = true;
+  })().catch((e) => { window.__settingsErr = e.message; });
+`, ctx);
+
 // 主进程把 async 错误捕获转发
 process.on("unhandledRejection", (e) => { errors.push(e); });
 
@@ -104,6 +126,15 @@ setTimeout(() => {
     process.exit(1);
   } else {
     console.log("✅ init() 完整执行无未捕获异常");
-    process.exit(0);
+    if (sandbox.__settingsErr) {
+      console.log("❌ settings 保存断言失败:", sandbox.__settingsErr);
+      process.exit(1);
+    } else if (sandbox.__settingsOk) {
+      console.log("✅ settings POST保存→GET读回 不回退，且已脱敏（修复『点保存读旧值』bug）");
+      process.exit(0);
+    } else {
+      console.log("⚠️ settings 断言未执行（可能未调用）");
+      process.exit(0);
+    }
   }
 }, 300);

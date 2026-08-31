@@ -26,8 +26,15 @@ const MOCK_ROUTES = [
   },
   {
     match: (p) => p === "/api/settings",
-    get: () => ({ ok: true, settings: { gbCookie: "", downloadConcurrency: 3 } }),
-    note: "真实返回：{ ok, settings:{ gbCookie, downloadConcurrency, sessionHours?, ... } }",
+    get: () => ({ ok: true, settings: mockSettingsPublic() }),
+    post: (body) => {
+      // 2026-09-01 模板演示：非空才写入（空串 = 不改），并脱敏返回
+      if (typeof body.gbCookie === "string" && String(body.gbCookie).trim()) {
+        mockState.gbCookie = String(body.gbCookie).trim();
+      }
+      return { ok: true, settings: mockSettingsPublic() };
+    },
+    note: "真实返回：{ ok, settings:{ hasGbCookie, downloadConcurrency, sessionHours?, ... } }（脱敏，不回传 gbCookie 明文；POST 非空才写）",
   },
   {
     match: (p) => p === "/api/login",
@@ -165,8 +172,14 @@ const MOCK_ROUTES = [
   // ---------- 香蕉网信息（设置页/搜索页角色下拉） ----------
   {
     match: (p) => p.startsWith("/api/gb-login-status"),
-    get: () => ({ ok: true, loggedIn: false, configured: false }),
-    note: "真实返回：{ ok, loggedIn, configured, detail? }",
+    get: () => {
+      // 模板演示：mock 里配置了 gbCookie 就假装已登录（用户名演示值）
+      if (mockState.gbCookie) {
+        return { ok: true, configured: true, loggedIn: true, username: "demo_user", idRow: 2330203, profileUrl: "https://gamebanana.com/members/2330203", detail: "已登录：demo_user" };
+      }
+      return { ok: true, loggedIn: false, configured: false, detail: "未配置 gbCookie" };
+    },
+    note: "真实返回：{ ok, loggedIn, configured, username?, idRow?, profileUrl?, detail? }",
   },
   {
     match: (p) => p.startsWith("/api/gb-game-info"),
@@ -237,6 +250,12 @@ const MOCK_ROUTES = [
   },
 ];
 
+// 2026-09-01 模板内存态（刷新丢失）：gbCookie 只存「是否已配置」，明文不回传
+const mockState = { gbCookie: "", downloadConcurrency: 3 };
+function mockSettingsPublic() {
+  return { hasGbCookie: !!String(mockState.gbCookie || "").trim(), downloadConcurrency: mockState.downloadConcurrency };
+}
+
 // 全局 api()：模板版。签名与真实后端版完全一致（path, method, body）。
 // 接真实后端时：把本函数替换成真实 fetch 实现即可（参考模板 app.js 顶部注释）。
 async function api(path, method = "GET", body) {
@@ -244,7 +263,10 @@ async function api(path, method = "GET", body) {
   await new Promise((r) => setTimeout(r, 60));
   for (const rt of MOCK_ROUTES) {
     if (rt.match(path)) {
-      const data = rt.get ? rt.get() : { ok: true };
+      // 2026-09-01 修复：区分 method——POST 走 rt.post 分支（此前统一走 get，导致「点保存读旧值」）
+      const data = (method === "POST" && typeof rt.post === "function")
+        ? rt.post(body || {})
+        : (typeof rt.get === "function" ? rt.get() : { ok: true });
       console.info("[mock-api] %s %s →", method, path, rt.note || "", data);
       return data;
     }
@@ -260,7 +282,15 @@ window.fetch = async function (url, opts) {
   const path = String(url).split("?")[0];
   for (const rt of MOCK_ROUTES) {
     if (rt.match(path)) {
-      const data = rt.get ? rt.get() : { ok: true };
+      // 2026-09-01 与 api() 一致：POST 走 rt.post 分支，避免「保存读旧值」
+      const method = (opts && opts.method) || "GET";
+      let body = null;
+      if (opts && opts.body) {
+        try { body = typeof opts.body === "string" ? JSON.parse(opts.body) : opts.body; } catch (_) { body = null; }
+      }
+      const data = (method === "POST" && typeof rt.post === "function")
+        ? rt.post(body || {})
+        : (typeof rt.get === "function" ? rt.get() : { ok: true });
       const status = 200;
       if (rt.blob) {
         return new Response(new Blob([rt.blob()], { type: "application/octet-stream" }), { status });

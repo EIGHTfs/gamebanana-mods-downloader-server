@@ -10,19 +10,21 @@ let searchResults = [];
 let searchPollTimer = null;
 let taskPollTimer = null;
 
-async function api(path, method = "GET", body) {
-  const opts = { method, headers: {} };
-  if (body !== undefined) {
-    opts.headers["Content-Type"] = "application/json";
-    opts.body = JSON.stringify(body);
-  }
-  const r = await fetch(path, opts);
-  if (r.status === 401) {
-    location.href = "/login.html";
-    throw new Error("未登录");
-  }
-  return r.json();
-}
+// ============================================================
+// 【模板版】不再在此定义 api()——由外部提供全局 api(path, method, body)：
+//   - 纯前端模板：docs/ui-template/mock-api.js 提供（返回空态 + 契约注释）
+//   - 接真实后端：提供同签名的 api()，例如原本的 fetch 实现：
+// async function api(path, method = "GET", body) {
+//   const opts = { method, headers: {} };
+//   if (body !== undefined) {
+//     opts.headers["Content-Type"] = "application/json";
+//     opts.body = JSON.stringify(body);
+//   }
+//   const r = await fetch(path, opts);
+//   if (r.status === 401) { location.href = "/login.html"; throw new Error("未登录"); }
+//   return r.json();
+// }
+// ============================================================
 
 function esc(s) {
   return String(s == null ? "" : s)
@@ -130,8 +132,9 @@ function loadGameSelects() {
 function bindSearch() {
   const now = new Date();
   const d30 = new Date(now.getTime() - 30 * 86400000);
-  // 2026-08-31 修复：toISOString() 是 UTC（东八区会显示成前一天），改用本地日期拼 YYYY-MM-DD
+  // 修复：toISOString() 是 UTC（东八区会显示成前一天），改用本地日期拼 YYYY-MM-DD
   const localDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // const localDate = (d) => d.toLocaleDateString("sv-SE"); // 备选写法（sv-SE 恰好输出 YYYY-MM-DD）
   $("#searchEnd").value = localDate(now);
   $("#searchStart").value = localDate(d30);
 
@@ -380,7 +383,7 @@ function bindKeywordSearch() {
 
 function startSearchPoll() {
   if (searchPollTimer) clearInterval(searchPollTimer);
-  // 2026-08-31 防重入：上一次请求未返回时跳过本次（原实现无标志，慢响应会堆叠）
+  // 防重入：上一次请求未返回时跳过本次（原实现无标志，慢响应会堆叠请求）
   let inFlight = false;
   searchPollTimer = setInterval(async () => {
     if (inFlight) return;
@@ -563,7 +566,7 @@ function showFeedback(msg, type) {
 
 function startTaskPoll() {
   if (taskPollTimer) clearInterval(taskPollTimer);
-  // 2026-08-31 防重入：上一次请求未返回时跳过本次
+  // 防重入：上一次请求未返回时跳过本次
   let inFlight = false;
   taskPollTimer = setInterval(async () => {
     if (inFlight) return;

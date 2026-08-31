@@ -50,6 +50,7 @@ docs/ui-template/
 ├── favicon.png       浏览器标签页图标（72px 香蕉）
 ├── app.js            前端交互逻辑（模板版，已去后端耦合）
 ├── mock-api.js       ★ 模拟后端层：全局 api() + fetch 接管 + 接口契约注释
+├── template-runtime-check.js   验证脚本（fake-DOM 跑 init，确认无未捕获异常）
 └── README.md         本文件
 ```
 
@@ -90,28 +91,40 @@ docs/ui-template/
 5. **`init()` 重复请求**：启动时 `/api/settings` 请求 3 次、`/api/games` 2 次
    （loadGameSelects + loadSettings 各拉一次）→ 模板未动真实接口数，但 mock
    下无副作用；真实后端优化建议见下。
+6. **状态行样板**：原来 ~40 处散落的 `el.textContent = ...; el.className = "status ok/err"`
+   重复写法 → 新增 `setStatus(el, msg, type)` helper 统一收敛（旧代码保留注释）。
+7. **原生 alert() 与页面 toast 混用**：信息性 alert（下载失败/重试/跳过等）→
+   统一改用 `showFeedback()` toast；`confirm()` 破坏性确认保留。
 
 ### B 档：仅记录，模板保留原样（改动风险大/需后端配合）
 
-6. **`window.__games` / `window.__addGameInfo` / `window.__gbChars` /
+8. **`window.__games` / `window.__addGameInfo` / `window.__gbChars` /
    `window.__setRestoreModeDisabled` 全局命名空间传递状态**：多个函数靠挂
    window 传值，缺模块化。建议后续改成单例状态对象。
-7. **两套「可搜索角色下拉」几乎重复**（bindKeywordSearch 的 `kwRoleCombo` vs
+9. **两套「可搜索角色下拉」几乎重复**（bindKeywordSearch 的 `kwRoleCombo` vs
    bindMerge 的 `mmComboList`，各自 20+ 行过滤/键盘/点击处理）→ 建议抽成
    一个 `<role-combo>` 组件。
-8. **大量 `catch (_) {}` 静默吞错**（轮询/加载里十几处）→ 建议统一 console.warn。
-9. **`alert()`/`confirm()` 原生弹窗与页面内 toast 混用**（下载停止/合并/清空
-   用原生 confirm，进度反馈用 showFeedback toast）→ 建议统一。
-10. **`api()` 401 硬编码 `location.href = "/login.html"`**：子路径部署会跳错根
+10. **大量 `catch (_) {}` 静默吞错**（轮询/加载里十几处）→ 建议统一 console.warn。
+11. **`api()` 401 硬编码 `location.href = "/login.html"`**：子路径部署会跳错根
     路径 → 建议用相对路径或配置项。
-11. **单文件 1419 行无模块化**：顶层函数全部全局可见，命名冲突风险。
-12. **`$("#searchEnd")` 等初始化直接写死当日前端值**：与后端默认范围可能不一致。
+12. **单文件无模块化**（现约 1430 行）：顶层函数全部全局可见，命名冲突风险。
+13. **`$("#searchEnd")` 等初始化直接写死当日前端值**：与后端默认范围可能不一致。
 
-> 这 12 条也建议同步考虑修到真实版 server/public/app.js（需后端回归测试）。
+> 说明：A 档第 6/7 条（setStatus、alert→toast）已同时修到真实版 server/public/app.js
+> 并同步回模板；B 档仍建议后续跟进（需后端回归测试）。
 
 ---
 
-## 六、界面里有哪些区域（便于复用裁剪）
+## 六、界面文案约定（2026-08-31 用户要求）
+
+- **界面不留「实际例子」**：提示/占位符不写具体 mod 链接（如某 mod id）、
+  具体角色名（如某角色名→英文名）、具体 hash（如某 jpg 短名）、具体路径等。
+  只保留通用功能说明（例：「每行一个 Mod 链接或纯数字 id」）。
+- 若你复用模板做别的东西，提示里也建议避免硬编码示例值，方便换领域复用。
+
+---
+
+## 七、界面里有哪些区域（便于复用裁剪）
 
 | Tab | 关键交互 | 依赖端点（mock 已覆盖） |
 |---|---|---|
@@ -122,7 +135,24 @@ docs/ui-template/
 
 ---
 
-## 七、已知取舍
+## 八、SA6400 上现成的预览服务（可选）
+
+本项目的 SA6400 上已另起一个独立静态服务（与 8642 后端无关）：
+
+```bash
+# 服务在 SA6400 后台运行（python3 -m http.server 8890，目录=docs/ui-template）
+# 浏览器打开（局域网内任意设备）：
+#   http://sa6400.local:8890/index.html
+# 进程：python3（PID 可在 SA6400 `netstat -tlnp | grep 8890` 查到），
+# 日志：/tmp/gbmd-template-httpd.log
+```
+
+> 注意：该服务是临时起的，NAS 重启后不会自动恢复；要长期留用可把命令写进
+> 部署脚本。
+
+---
+
+## 九、已知取舍
 
 - 模板的登录页/设置页点按钮会「模拟成功」，但不会真正改变任何东西。
 - 导出按钮会下载一个占位文件（内容为 mock 占位字符串），并非真实数据。

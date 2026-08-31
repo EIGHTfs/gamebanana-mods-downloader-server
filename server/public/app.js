@@ -339,7 +339,7 @@ function bindKeywordSearch() {
         const r = await api("/api/gb-characters?game=" + encodeURIComponent(game));
         if (!r.ok) throw new Error(r.error || "获取失败");
         kwRoleChars = r.characters || [];
-        roleInput.placeholder = "输入过滤，如 Od → Odette";
+        roleInput.placeholder = "输入过滤";
         if (st) setStatus(st, `已加载 ${kwRoleChars.length} 个角色${r.fromCache ? "（缓存）" : ""}（选角色后自动搜索；设置页可手动刷新）`, "ok");
         return;
       } catch (e) {
@@ -788,7 +788,7 @@ function makeRootRow(name, entry) {
     <input class="root-game" value="${esc(name)}" readonly style="background:var(--card2);max-width:200px">
     <input class="root-cn" value="${esc(cn)}" readonly style="background:var(--card2);max-width:90px">
     <input class="root-id" value="${esc(id)}" readonly style="background:var(--card2);max-width:70px">
-    <input class="root-path" placeholder="下载路径根目录（如 /volume6/.../Mods/）" value="${esc(p)}" style="flex:1">
+    <input class="root-path" placeholder="下载路径根目录" value="${esc(p)}" style="flex:1">
     <button class="ghost browse-btn" type="button" title="读取本地选择目录">📂</button>`;
   // 2026-08-26 用户要求：设置里设置下载地址增加「读取本地选择」——点 📂 弹目录选择器
   div.querySelector(".browse-btn").addEventListener("click", () => openBrowse(div.querySelector(".root-path")));
@@ -1004,7 +1004,7 @@ function bindSettings() {
       const r = await api("/api/hash-query?hash=" + encodeURIComponent(h));
       if (!r.ok) throw new Error(r.error || "查询失败");
       if (!r.found) {
-        st.textContent = "未找到（试试：压缩包 GB 页面 MD5 / 图片原始短名如 69b46e18405cc.jpg，或先「重建索引」）";
+        st.textContent = "未找到（试试：压缩包 GB 页面 MD5 / 图片原始短名，或先「重建索引」）";
         st.className = "status err";
         res.innerHTML = "";
         return;
@@ -1299,7 +1299,7 @@ function bindMerge() {
         if (st) {
           st.textContent = force
             ? `已重新获取并保存 ${window.__gbChars.length} 个角色（json/role-cache.json）`
-            : `已加载 ${window.__gbChars.length} 个角色${r.fromCache ? "（缓存）" : "（新获取）"}（英文名输入时过滤选择，如 Od → Odette）`;
+            : `已加载 ${window.__gbChars.length} 个角色${r.fromCache ? "（缓存）" : "（新获取）"}（英文名输入时过滤选择）`;
           st.className = "status ok";
         }
         return;

@@ -44,8 +44,8 @@ try {
   <div class="tab-panel active" id="panel-download">
     <div class="card">
       <h2>下载 Mod</h2>
-      <p class="hint">每行一个 Mod 链接（https://gamebanana.com/mods/704164）或纯数字 id（704164）</p>
-      <textarea id="batchInput" rows="8" placeholder="https://gamebanana.com/mods/704164&#10;704164" style="width:100%"></textarea>
+      <p class="hint">每行一个 Mod 链接或纯数字 id</p>
+      <textarea id="batchInput" rows="8" placeholder="每行一个 Mod 链接或纯数字 id" style="width:100%"></textarea>
       <div class="row mt">
         <button class="primary" id="batchBtn" type="button">开始下载</button>
         <button class="ghost" id="clearBtn" type="button">清空</button>
@@ -81,7 +81,7 @@ try {
       <div class="row mt">
         <label>并发数 <input type="number" id="concurrencyInput" min="1" max="32" value="4" style="width:70px"></label>
         <button class="ghost" id="concurrencyBtn" type="button">应用</button>
-        <span class="hint">（仅此一处可改并发数）</span>
+        
         <div class="status" id="concurrencyStatus"></div>
       </div>
       <div class="row mt">
@@ -100,7 +100,7 @@ try {
     <!-- 2026-08-31 用户要求：关键词搜索 Mod 和 按时间搜索 Mod 合并为一个卡片，共用 游戏选择/普通 NSFW 筛选 -->
     <div class="card">
       <h2>搜索 Mod</h2>
-      <p class="hint">关键词搜索（中文/角色名/别号，自动归一到英文，如「桑多涅」「吉约丹小姐」→ Sandrone）或按时间搜索（新增/修改/更新任一命中），共用下方游戏与分级筛选</p>
+      <p class="hint">关键词搜索（中文/角色名/别号，自动归一到英文）或按时间搜索（新增/修改/更新任一命中），共用下方游戏与分级筛选</p>
       <div class="row">
         <label>游戏
           <select id="searchGameSelect">
@@ -111,9 +111,9 @@ try {
         <label><input type="checkbox" id="filterNsfw" checked> NSFW</label>
       </div>
       <div class="row mt">
-        <label>关键词 <input type="text" id="kwInput" placeholder="如 Sandrone、桑多涅、Lingerie" style="width:240px"></label>
+        <label>关键词 <input type="text" id="kwInput" placeholder="输入关键词" style="width:240px"></label>
         <div style="position:relative">
-          <label>选角色 <input type="text" id="kwRoleInput" placeholder="输入过滤，如 Od → Odette" style="width:150px" disabled autocomplete="off" title="从香蕉网获取该游戏角色列表，选中后自动填入关键词并搜索"></label>
+          <label>选角色 <input type="text" id="kwRoleInput" placeholder="输入过滤" style="width:150px" disabled autocomplete="off" title="从香蕉网获取该游戏角色列表，选中后自动填入关键词并搜索"></label>
           <div class="combo-list" id="kwRoleCombo" style="display:none"></div>
         </div>
         <button class="primary" id="kwSearchBtn" type="button">搜索</button>
@@ -174,7 +174,7 @@ try {
 
       <!-- 2026-08-31 用户要求：文件夹合并 = 卡片第一个功能（h3 小标题），🔄 重新获取角色 之后换行分隔 -->
       <h3 style="margin:14px 0 8px;font-size:14px;color:var(--primary)">🔀 文件夹合并（按映射重命名角色目录）</h3>
-      <p class="hint" style="margin:4px 0 8px">例：文件夹 <b>Sandrone</b> 根据映射重命名为 <b>Sandrone – 桑多涅</b>；同角色已有「英文 – 中文」目录时内容并入，空目录进根目录 .trash（可恢复）</p>
+      <p class="hint" style="margin:4px 0 8px">根据映射将文件夹重命名为「英文 – 中文」；同角色已有规范目录时内容并入，空目录进根目录 .trash（可恢复）</p>
       <div class="row">
         <label>游戏
           <select id="mmGameSelect">
@@ -211,7 +211,7 @@ try {
           <select id="mmAddWarehouse" disabled><option value="">— 请先选择游戏 —</option></select>
         </label>
         <div style="position:relative">
-          <label>英文名 <input type="text" id="mmAddEn" placeholder="输入过滤，如 Od → Odette" style="width:170px" disabled autocomplete="off"></label>
+          <label>英文名 <input type="text" id="mmAddEn" placeholder="输入过滤" style="width:170px" disabled autocomplete="off"></label>
           <div class="combo-list" id="mmComboList" style="display:none"></div>
         </div>
         <label>中文名 <input type="text" id="mmAddZh" placeholder="奥黛塔" style="width:110px" disabled></label>
@@ -232,14 +232,14 @@ try {
         <button id="gbLoginCheckBtn" type="button">检测登录状态</button>
         <span id="gbLoginStatus"></span>
       </div>
-      <p class="hint mt">（并发数在「下载进度」页修改，仅此一处）</p>
+      
     </div>
 
     <div class="card">
       <h2>HTML 反查</h2>
-      <p class="hint">输入文件 hash（md5）<b>或图片原始短名</b>（GB 原名，如 <code>69b46e18405cc.jpg</code>），反查它属于哪个 mod。三索引：GB 信息表（hash → 线上 mod 信息）+ 本地表（hash → 实际下载位置）+ HTML 表（GB 原名短名 → mod，扫描全部 description.html）。</p>
+      <p class="hint">输入文件 hash（md5）<b>或图片原始短名</b>（GB 原名），反查它属于哪个 mod。三索引：GB 信息表（hash → 线上 mod 信息）+ 本地表（hash → 实际下载位置）+ HTML 表（GB 原名短名 → mod，扫描全部 description.html）。</p>
       <div class="row">
-        <input type="text" id="hashInput" placeholder="hash 或图片短名，如 69b46e18405cc.jpg / 92cf563c..." style="width:340px">
+        <input type="text" id="hashInput" placeholder="hash 或图片短名" style="width:340px">
         <button id="hashQueryBtn" type="button">查询</button>
         <button id="hashRebuildBtn" type="button" class="ghost" title="下载了新 mod 后重建索引（启动时也会自动建）">重建索引</button>
       </div>
@@ -247,7 +247,7 @@ try {
       <div id="hashResult"></div>
       <hr style="border:none;border-top:1px dashed var(--border);margin:12px 0">
       <div class="row">
-        <input type="text" id="hashSearchInput" placeholder="按 mod 名 / 作者搜索（离线目录，如 Odette / monsoon04）" style="width:340px">
+        <input type="text" id="hashSearchInput" placeholder="按 mod 名 / 作者搜索" style="width:340px">
         <button id="hashSearchBtn" type="button">搜索</button>
       </div>
       <div class="status" id="hashSearchStatus"></div>

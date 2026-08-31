@@ -687,7 +687,9 @@ const server = http.createServer(async (req, res) => {
           "Content-Type": "text/javascript; charset=utf-8",
           // 2026-09-01 用户指出：iwara 直接触发油猴安装/更新，gbmd 却弹下载——根因是 attachment 强制下载。
           // 改 inline：浏览器直接把 .user.js 当脚本打开 → Tampermonkey/Violentmonkey 自动弹安装/更新。
+          // 2026-09-01 ACAO: Tampermonkey 安装页从扩展上下文 fetch 脚本内容，加 * 避免 CORS 拦截。
           "Content-Disposition": "inline; filename=gamebanana-cookie-userscript.user.js",
+          "Access-Control-Allow-Origin": "*",
           "Cache-Control": "no-store"
         });
         res.end(data);

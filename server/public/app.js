@@ -1091,7 +1091,7 @@ async function mergeRolesPreview() {
   const el = $("#mmMergePlan");
   if (!d || !d.ok) { st.textContent = "失败: " + ((d && d.error) || "未知"); st.className = "status err"; return; }
   mergePlan = d.merged || [];
-  st.textContent = `发现 ${d.groups} 组可合并角色目录（${mergePlan.length} 个纯英文目录将重命名为「英文 – 中文」）`;
+  st.textContent = `发现 ${d.groups} 组可合并角色目录（${mergePlan.length} 个将归一到标准「英文 – 中文」，变体目录并入标准目录）`;
   st.className = "status ok";
   el.innerHTML = mergePlan.length
     ? mergePlan.map((m) => `<div class="mm-mis">🔀 ${esc(m.from.split("/Mods/")[1] || m.from)} → <b>${esc(m.to.split("/Mods/")[1] || m.to)}</b></div>`).join("")
@@ -1099,7 +1099,7 @@ async function mergeRolesPreview() {
 }
 async function mergeRolesRun() {
   if (!mergePlan.length) { alert("请先「预览合并计划」"); return; }
-  if (!confirm(`执行合并：${mergePlan.length} 个纯英文目录重命名为「英文 – 中文」（同角色已有规范目录则并入，空目录进 .trash）？`)) return;
+  if (!confirm(`执行合并：${mergePlan.length} 个目录归一为「英文 – 中文」（变体目录并入标准目录；同角色已有规范目录则并入，空目录进 .trash）？`)) return;
   const game = $("#mmGameSelect").value;
   const st = $("#mmMergeStatus");
   st.textContent = "合并中…";

@@ -27,8 +27,47 @@ function normDirName(name) {
 
 // 扫描游戏根下各仓库分类目录，找可合并的角色目录（返回计划）
 // 返回 [{ en, zh, cat, canonical, plain: [目录路径] }]
+// ============================================================
+// 重写 findRoleDuplicates（2026-08-31）：支持 variants 变体目录 → 合并到 roles 标准目录
+// 用户原话：「文件夹合并功能有问题，文件夹是变体里的不能合并成按roles」「有 – 分割就是文件夹两边
+//   任意一个在变体里就是不符合，没有 – 分割就是文件夹整体要在变体里（一般这种就是纯英文，纯中文情况）」
+// 用户原话：「包括Nekomiya Mana – 猫又·玛娜，我json手动修改成了 "Nekomiya Mana": "猫宫又奈"，
+//   Nekomiya Mana – 猫又·玛娜也会被合并成Nekomiya Mana – 猫宫又奈」
+// 判定规则：
+//   · 目录名有「–」格式：拆 en/zh 两部分；en 命中 roles key 或 variants 英文条目 → 归属该角色；
+//     否则 zh 命中 roles value 或 variants 中文条目 → 归属该角色
+//   · 目录名无「–」（纯英文/纯中文）：整体命中 roles key/value 或 variants 条目 → 归属该角色
+//   · 归属角色后：目录名 === `${标准en} – ${标准zh}` → canonical（标准目录）；
+//     否则（变体命名/中文不符）→ plain（需要并入标准目录；标准目录不存在则重命名）
+//   · 不匹配任何角色 → 跳过不动（如放错位置的 mod 文件夹 Nico cosplay 東雪蓮 等）
+// 生效范围不变：只扫 root/cat/*（角色分类层直接子目录），不进入 mod 文件夹
+// ============================================================
+// 构建「角色名(标准/变体) → 标准角色 {en, zh}」查找表
+// 用户原话：变体「就是为了让你找到标准roles合并」——表的作用就是把任意变体名映射回标准组合
+function buildRoleLookup(game) {
+  const gameMap = cfg.readGameMapping(game) || {};
+  const roles = (gameMap.roles) || {};
+  const variants = (gameMap.variants) || {};
+  const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");
+  const byEn = new Map(); // 英文(含变体英文) → 标准 {en, zh}
+  const byZh = new Map(); // 中文(含变体中文) → 标准 {en, zh}
+  for (const [en, zh] of Object.entries(roles)) {
+    const role = { en, zh };
+    byEn.set(norm(en), role); // 标准英文
+    byZh.set(norm(zh), role); // 标准中文
+    const arr = Array.isArray(variants[zh]) ? variants[zh] : [];
+    for (const v of arr) {
+      const n = norm(v);
+      if (/[\u4e00-\u9fff]/.test(v)) byZh.set(n, role); // 中文变体 → 中文侧
+      else byEn.set(n, role);                              // 英文变体 → 英文侧
+    }
+  }
+  return { byEn, byZh, norm };
+}
+
 function findRoleDuplicates(root, game) {
-  const groups = new Map(); // cat|en -> { en, zh, cat, canonical, plain: [] }
+  const { byEn, byZh, norm } = buildRoleLookup(game);
+  const groups = new Map(); // cat|标准en -> { en, zh, cat, canonical, plain: [] }
   if (!root || !fs.existsSync(root)) return [];
   let cats = [];
   try { cats = fs.readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory()); } catch (_) { return []; }
@@ -39,33 +78,34 @@ function findRoleDuplicates(root, game) {
     try { dirs = fs.readdirSync(catDir, { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith(".")); } catch (_) { continue; }
     for (const d of dirs) {
       const full = path.join(catDir, d.name);
-      const enOf = roleEnOf(d.name);
-      // 中文名（该角色的中文译名，用于无规范目录时直接重命名）
-      let zh = "";
-      if (enOf) {
-        zh = mapping.roleZhOf(enOf, game) || "";
-      } else {
-        // 纯英文目录：查映射是否有中文 → 可重命名为「英文 – 中文」
-        zh = mapping.roleZhOf(d.name, game) || "";
-      }
-      const en = enOf || d.name;
-      const key = cat.name + "|" + normDirName(en);
-      if (!groups.has(key)) groups.set(key, { en, zh, cat: cat.name, canonical: null, plain: [] });
+      // 拆「英文 – 中文」：parts[0]=en、parts[1]=zh（无 – 时整体当名字查）
+      const parts = String(d.name).split(/\s*[\u2013\u2014]\s*/);
+      const enPart = parts.length > 1 ? parts[0].trim() : "";
+      const zhPart = parts.length > 1 ? parts[1].trim() : "";
+      let role = null;
+      if (enPart) role = byEn.get(norm(enPart)) || null;      // 英文侧（标准/变体）优先
+      if (!role && zhPart) role = byZh.get(norm(zhPart)) || null; // 中文侧兜底
+      if (!role && !enPart) role = byEn.get(norm(d.name)) || byZh.get(norm(d.name)) || null; // 无 – 整体查
+      if (!role) continue; // 不匹配任何角色 → 跳过（放错位置的 mod 目录不动）
+      const canonicalName = role.en + " – " + role.zh;
+      const key = cat.name + "|" + norm(role.en);
+      if (!groups.has(key)) groups.set(key, { en: role.en, zh: role.zh, cat: cat.name, canonical: null, plain: [] });
       const g = groups.get(key);
-      if (enOf) {
-        if (!g.canonical) g.canonical = full;
+      if (d.name === canonicalName) {
+        if (!g.canonical) g.canonical = full; // 标准目录名精确匹配 → canonical
       } else {
-        g.plain.push(full);
+        g.plain.push(full); // 变体命名/中文不符 → 待合并（并入 canonical；无则重命名）
       }
     }
   }
-  // 只保留：有中文映射的角色目录组（纯英文 且 有 zh；或 有规范目录+纯英文）
+  // 只保留：有待合并目录的角色组
   const dups = [];
   for (const g of groups.values()) {
-    if (g.zh && g.plain.length) dups.push(g); // 有映射 → 可重命名/合并
+    if (g.plain.length) dups.push(g);
   }
   return dups;
 }
+
 
 // 递归合并：把 src 里独有的文件/子目录移入 dst（同名文件跳过不覆盖；同名子目录递归合并内容）
 // 返回移动的文件数

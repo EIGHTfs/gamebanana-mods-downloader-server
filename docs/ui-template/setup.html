@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" type="image/png" href="favicon.png">
+<title>GameBanana Mod Downloader · 首次设置</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <h1><img src="logo.png" alt="GameBanana Mod Downloader" style="height:26px;vertical-align:middle"></h1>
+  <div class="card">
+    <h2>首次设置</h2>
+    <p class="hint">服务器尚未设置访问密码。请设置一个密码（至少 4 位），之后访问所有页面都需要登录。</p>
+    <input type="password" id="pwd" placeholder="设置访问密码">
+    <input type="password" id="pwd2" placeholder="再次输入确认">
+    <button class="primary" id="btn">设置密码并进入</button>
+    <div class="status" id="status"></div>
+  </div>
+</div>
+<script>
+document.getElementById("btn").addEventListener("click", async () => {
+  const pwd = document.getElementById("pwd").value;
+  const pwd2 = document.getElementById("pwd2").value;
+  const st = document.getElementById("status");
+  if (pwd.length < 4) { st.textContent = "密码至少 4 位"; st.className = "status err"; return; }
+  if (pwd !== pwd2) { st.textContent = "两次输入不一致"; st.className = "status err"; return; }
+  try {
+    const r = await fetch("/api/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pwd })
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || "设置失败");
+    const l = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pwd })
+    });
+    const lj = await l.json();
+    if (!lj.ok) throw new Error(lj.error || "登录失败");
+    location.href = "/";
+  } catch (e) {
+    st.textContent = e.message;
+    st.className = "status err";
+  }
+});
+</script>
+<!-- 纯前端模板：mock-api.js 让登录/设置请求走 mock（无需后端） -->
+<script src="mock-api.js"></script>
+</body>
+</html>

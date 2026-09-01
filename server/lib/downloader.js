@@ -1585,13 +1585,16 @@ function skipItem({ path: p, url: u }) {
   return { ok: true, skipped: found, message: `已跳过 ${found} 个失败项（下次请求可再下载）` };
 }
 
+// 2026-09-02 修复：SA6400 实测 3 个错误项为 type=error、path=""（只有 mod url），
+//   旧逻辑 if (!item.path) continue 把它们排除 → 用户「不能清除」。
+//   清除 = 标记 skipped，错误项按 url 匹配即可（无需 path）。
 function skipAllFailed() {
   if (!task) return { ok: false, error: "无下载任务" };
   const active = new Set((task.activeItems || []).map((a) => a.idx));
   let n = 0;
   for (let i = 0; i < (task.items || []).length; i++) {
     const item = task.items[i];
-    if (!item || !item.path) continue;
+    if (!item) continue;
     const r = resultAt(i);
     if (r && r.ok) continue;   // 成功/已跳过 → 不动
     if (active.has(i)) continue;

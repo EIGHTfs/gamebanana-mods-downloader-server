@@ -487,6 +487,23 @@ function bindProgress() {
   });
   // 2026-08-26 用户要求加回：失败行 🔄重试 / 🚫跳过 按钮（事件委托）
   document.addEventListener("click", async (ev) => {
+    // 2026-09-02 新增：错误文本点击复制（.mm-err-copy）
+    const errCopy = ev.target.closest(".mm-err-copy");
+    if (errCopy) {
+      ev.preventDefault();
+      const txt = errCopy.dataset.copy || errCopy.textContent || "";
+      try {
+        if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(txt); }
+        else { // 非 https（http 局域网）时 clipboard API 不可用 → 临时 textarea 回退
+          const ta = document.createElement("textarea");
+          ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
+          document.body.appendChild(ta); ta.select();
+          document.execCommand("copy"); document.body.removeChild(ta);
+        }
+        showToast("已复制错误文本", "ok");
+      } catch (_) { showToast("复制失败，请手动选中复制", "err"); }
+      return;
+    }
     const retryBtn = ev.target.closest(".mm-retry-btn");
     if (retryBtn) {
       ev.preventDefault();
@@ -746,11 +763,16 @@ function renderTask(task) {
       }
       // 2026-08-26 用户要求加回：失败行 🔄重试 / 🚫跳过 按钮；
       //   2026-08-26 修复：卡住行（无结果且任务非运行中）也显示按钮（重试/跳过后才能处理它）
+      //   2026-09-02 新增：type=error 且 path="" 的错误项（构建失败，只有 mod url）
+      //     ——无法重试（无文件可下），但可清除（标记跳过）；显示「🚫 清除」
       let actBtns = "";
       const canAct = r ? (r.ok === false && !r.skipped) : (task.status !== "running" && task.status !== "preparing");
       if (canAct && item.path) {
         actBtns = ` <button class="mm-retry-btn" data-url="${esc(item.url || "")}" data-path="${esc(item.path || "")}" title="重试下载此文件">🔄 重试</button>` +
           ` <button class="mm-skip-btn" data-url="${esc(item.url || "")}" data-path="${esc(item.path || "")}" title="跳过此文件（下次请求可再下载）">🚫 跳过</button>`;
+      } else if (canAct && item.type === "error" && (item.url || item.displayName)) {
+        // 无 path 的错误项：无文件可重试，只提供清除（标记跳过，避免反复显示错误）
+        actBtns = ` <button class="mm-skip-btn" data-url="${esc(item.url || "")}" data-path="" title="清除此错误（下次请求可再尝试此 mod）">🚫 清除</button>`;
       }
       // 2026-08-26 用户要求：跳过的图片也显示预览图（已存在/已下载的图片项都显示缩略图）
       const hasFile = r && (r.ok || (r.skipped && r.exists)) && item.path;
@@ -768,7 +790,11 @@ function renderTask(task) {
         if (ap.speed) statusText += ` ⚡${fmtSpeed(ap.speed)}`;
       }
       const bar = `<span class="row-bar ${barCls}"><span class="row-bar-fill" style="width:${barPct}%"></span></span>`;
-      return `<div class="item ${cls}"><span class="icon">${icon}</span><span class="item-name">${esc(item.displayName || item.path || item.url || "")}${bar}</span><span class="status-text">${esc(statusText)}${actBtns}</span>${thumb}</div>`;
+      // 2026-09-02 新增：失败/错误文本可点击复制（点击 .mm-err-copy 复制错误内容，便于排查/反馈）
+      const statusHtml = (cls === "fail" && statusText && statusText !== "失败" && statusText !== "错误")
+        ? `<span class="mm-err-copy" title="点击复制错误文本" data-copy="${esc(statusText)}">${esc(statusText)}</span>`
+        : esc(statusText);
+      return `<div class="item ${cls}"><span class="icon">${icon}</span><span class="item-name">${esc(item.displayName || item.path || item.url || "")}${bar}</span><span class="status-text">${statusHtml}${actBtns}</span>${thumb}</div>`;
     }).join("");
     return `<div class="mod-group">
       <div class="mod-group-head"><span class="group-num">${gi + 1}.</span><span>${esc(g.key)}</span><span class="mod-group-dir">📁 ${esc(g.targetDir)}</span></div>

@@ -82,6 +82,7 @@ node server/app.js
 │   └── gb-hash-index.json     # GB 线上信息表（hash → mod 信息，随仓库共享）
 ├── mapping/                   # 每个游戏的仓库/角色映射（如 Genshin Impact.json）
 ├── scripts/git-push.sh        # GitHub 推送辅助（从项目本地 .git-push-token 读凭据，token 不入库）
+├── scripts/gen-mapping.js     # 映射生成：按官方角色名单 + 磁盘目录反查，生成/重建 mapping/<游戏名>.json（默认 dryrun）
 └── 启动脚本（start-linux.sh / start-macos.sh / start-windows*.bat）
 ```
 

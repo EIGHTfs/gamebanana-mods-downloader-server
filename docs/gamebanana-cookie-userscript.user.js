@@ -246,7 +246,7 @@
 <div id="gbcred-body">
   <label>📤 发送到服务器（当前 mod 页链接 → 服务器自行解析下载，不读 Cookie）</label>
   <div id="gbcred-server-row">
-    <input id="gbcred-server" placeholder="sa6400.local:8642 或 http://IP:8642" spellcheck="false">
+    <input id="gbcred-server" placeholder="http://服务器IP:端口（如 http://192.168.1.10:8642）" spellcheck="false">
     <button id="gbcred-send">📤 发送</button>
   </div>
   <label style="margin-top:6px">服务器访问密码（可选；设了密码的服务器自动登录用，记在本地）</label>
@@ -319,7 +319,7 @@
 
         // 服务器地址为空 → 提示配置
         if (!normalizeServerBase(srv)) {
-            ub.textContent = "未配置服务器地址：在上方填 gbmd 服务器（如 sa6400.local:8642）后点「💾 记住地址」";
+            ub.textContent = "未配置服务器地址：在上方填 gbmd 服务器地址后点「💾 记住地址」";
             ub.className = "gbcred-userbar err";
             panelEl.classList.remove("server-ok");
             return;

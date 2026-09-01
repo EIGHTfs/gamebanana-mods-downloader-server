@@ -34,6 +34,23 @@ python3 -m http.server 8765
 打开后你能看到完整界面；点击「搜索/下载/合并」等按钮都会正常给出
 「空结果 / 无任务 / 加载中…」反馈，只是没有真实数据。
 
+### 怎么起真实后端（带端口指定）
+
+模板只含前端；真实后端 = 项目根 `server/app.js` + `start-linux.sh`。启动命令
+（`--port` 指定端口，优先级：命令 > config.json 的 `port` > 默认 8642）：
+
+```bash
+./start-linux.sh start --port 8643   # 启动，指定端口
+./start-linux.sh restart --port 8643 # 重启，指定端口
+./start-linux.sh start               # 默认（config.json 的 port，缺省 8642）
+./start-linux.sh stop                # 停止
+./start-linux.sh status              # 状态
+./start-linux.sh --set-password "新密码"  # 设置访问密码
+```
+
+> 前端接真实后端时，`api()` 指向 `http://<服务器IP>:<端口>`；油猴脚本的
+> 服务器地址输入框填同一地址（**不写死示例 IP**，让用户自己填）。
+
 > 浏览器控制台会打印 `[mock-api] ...` 与 `[mock-api] 纯前端模板模式已启用`，
 > 方便确认 mock 层在工作。
 
@@ -54,6 +71,7 @@ docs/ui-template/
 ├── template-runtime-check.js   验证脚本（fake-DOM 跑 init，确认无未捕获异常）
 └── README.md         本文件
 ```
+> 真实后端的启动脚本在项目根 `start-linux.sh`（本模板目录不含后端，见下「怎么起真实后端」）。
 
 ---
 

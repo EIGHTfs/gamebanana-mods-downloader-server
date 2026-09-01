@@ -39,6 +39,22 @@ function setStatus(el, msg, type) {
   el.className = type && type !== "status" ? "status " + type : "status";
 }
 
+// 2026-09-01 悬浮提示（右下角 toast，自动淡出；保存设置等操作反馈用）
+let _toastTimer = null;
+function showToast(msg, type) {
+  let el = $("#gbmdToast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "gbmdToast";
+    el.className = "gbmd-toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.className = "gbmd-toast " + (type === "err" ? "err" : "ok") + " show";
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.classList.remove("show"); }, 3200);
+}
+
 function fmtTs(ts) {
   if (!ts) return "-";
   const d = new Date(ts * 1000);
@@ -76,6 +92,9 @@ function bindTabs() {
       tab.classList.add("active");
       $("#panel-" + tab.dataset.tab).classList.add("active");
       try { history.replaceState(null, "", "#" + tab.dataset.tab); } catch (_) {}
+      // 2026-09-01 保存设置悬浮按钮：仅设置页显示
+      const fab = $("#saveSettingsFab");
+      if (fab) fab.classList.toggle("show", tab.dataset.tab === "settings");
     });
   });
   window.addEventListener("hashchange", () => {
@@ -906,7 +925,9 @@ function bindSettings() {
     }
   });
 
-  $("#saveSettingsBtn").addEventListener("click", async () => {
+  // 2026-09-01 用户要求：保存设置改悬浮按钮（右下角 💾，仅设置页显示）
+  const saveFab = $("#saveSettingsFab");
+  if (saveFab) saveFab.addEventListener("click", async () => {
     // 2026-08-26 用户要求：设置里不要并发数（只在「下载进度」页改并发）——payload 只存 gbCookie
     const payload = {
       gbCookie: $("#gbCookie").value.trim()
@@ -922,12 +943,11 @@ function bindSettings() {
         cookieEl.placeholder = "已保存（再贴新凭证才会覆盖；留空不改）";
         cookieEl.dataset.filled = "1";
       }
-      $("#settingsStatus").textContent = "已保存";
-      $("#settingsStatus").className = "status ok";
+      // 2026-09-01 用户要求：保存反馈改悬浮窗，不再用页面内嵌状态行
+      showToast("✅ 已保存设置", "ok");
       updateGbUserBadge(); // 保存后顶部用户名即时刷新
     } catch (e) {
-      $("#settingsStatus").textContent = "保存失败：" + e.message;
-      $("#settingsStatus").className = "status err";
+      showToast("❌ 保存失败：" + e.message, "err");
     }
   });
 

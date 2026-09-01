@@ -49,6 +49,38 @@ if (!gameArg) {
 const normEn = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const normZh = (s) => String(s || "").replace(/[\s·・]/g, "");
 
+// ---------- 非法字符映射（2026-09-02 用户要求：生成脚本处理映射文件里的非法字符）----------
+// 读取全局 mapping/illegalChars.json；key=非法字符 → value=合规字符。
+// 用途：
+//   1) 官方英文名含非法字符（如半角冒号 Yangyang: Xuanling）→ 自动补清洗后的全角变体进 variants，
+//      这样「合并/反查/搜索」同时支持半角与全角两种写法，角色目录不被 8.3 短名化；
+//   2) roles key 保持官方英文名（半角）不变——搜索/归一化仍以官方名匹配。
+const ILLEGAL_CHARS_FILE = path.join(MAPPING_DIR, "illegalChars.json");
+function loadIllegalChars() {
+  try {
+    if (fs.existsSync(ILLEGAL_CHARS_FILE)) {
+      const m = JSON.parse(fs.readFileSync(ILLEGAL_CHARS_FILE, "utf8"));
+      if (m && typeof m === "object") return m;
+    }
+  } catch (_) {}
+  return {};
+}
+const illegalCharsMap = loadIllegalChars();
+// 对字符串应用非法字符映射（split/join 全局替换，避开正则特殊字符）
+function applyIllegalChars(s, map) {
+  let str = String(s == null ? "" : s);
+  for (const [k, v] of Object.entries(map || {})) {
+    if (!k) continue;
+    str = str.split(k).join(String(v));
+  }
+  return str;
+}
+// 官方英文名清洗后 ≠ 原名 → 返回清洗版本（作为全角变体）；否则 null
+function cleanedVariantOf(en) {
+  const cleaned = applyIllegalChars(en, illegalCharsMap);
+  return cleaned !== en ? cleaned : null;
+}
+
 // 短名 → 官方名：词级相等 或 前缀 或 后缀
 function isRelated(short, full) {
   const sn = normEn(short);
@@ -192,6 +224,12 @@ for (const en of official) {
 
   const arr = [zh, en];
   const zhN = normZh(zh);
+
+  // 2026-09-02 用户要求：生成脚本处理映射文件里的非法字符。
+  //   官方英文名含非法字符（半角冒号等）→ 自动补「清洗后的全角变体」进 variants，
+  //   使合并/反查/搜索同时支持半角与全角两种写法（目录不被 8.3 短名化）。
+  const cleaned = cleanedVariantOf(en);
+  if (cleaned && !arr.includes(cleaned)) arr.push(cleaned);
 
   // 旧 roles 的英文 key：唯一命中官方名且非全等 → 变体
   for (const [k, v] of Object.entries(oldRoles)) {

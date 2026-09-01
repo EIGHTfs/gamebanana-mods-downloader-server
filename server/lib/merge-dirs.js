@@ -87,9 +87,12 @@ function findRoleDuplicates(root, game) {
       if (!role && zhPart) role = byZh.get(norm(zhPart)) || null; // 中文侧兜底
       if (!role && !enPart) role = byEn.get(norm(d.name)) || byZh.get(norm(d.name)) || null; // 无 – 整体查
       if (!role) continue; // 不匹配任何角色 → 跳过（放错位置的 mod 目录不动）
-      const canonicalName = role.en + " – " + role.zh;
+      // 2026-09-02 用户要求：合并目标目录名必须与下载路径一致（含非法字符清洗）。
+      //   canonicalName 用 mapping.itemDirName 生成（内部 applyIllegalChars 清洗，
+      //   如 Yangyang: Xuanling → Yangyang：Xuanling – 秧秧·玄翎），不再手动拼 role.en – role.zh
+      const canonicalName = mapping.itemDirName(role.en, game);
       const key = cat.name + "|" + norm(role.en);
-      if (!groups.has(key)) groups.set(key, { en: role.en, zh: role.zh, cat: cat.name, canonical: null, plain: [] });
+      if (!groups.has(key)) groups.set(key, { en: role.en, zh: role.zh, cat: cat.name, canonical: null, canonicalName, plain: [] });
       const g = groups.get(key);
       if (d.name === canonicalName) {
         if (!g.canonical) g.canonical = full; // 标准目录名精确匹配 → canonical
@@ -156,7 +159,9 @@ function executeMerge(dups, dryRun, root) {
   const merged = [], skipped = [], trashed = [];
   const trashRoot = path.join(root, ".trash");
   for (const g of dups || []) {
-    const canonicalName = `${g.en} – ${g.zh}`;
+    // 2026-09-02：目标名统一用 findRoleDuplicates 算好的 canonicalName（itemDirName 已清洗非法字符），
+    //   不再手动拼 `${g.en} – ${g.zh}`（否则合并出半角冒号目录，与下载路径不一致）
+    const canonicalName = g.canonicalName || `${g.en} – ${g.zh}`;
     for (const plain of g.plain) {
       const canonical = g.canonical || path.join(path.dirname(plain), canonicalName);
       if (dryRun) {

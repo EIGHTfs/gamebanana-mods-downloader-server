@@ -189,17 +189,6 @@ try {
         <button class="primary" id="saveDefaultPathBtn" type="button">保存默认下载位置</button>
         <span class="status" id="defaultPathStatus"></span>
       </div>
-
-      <hr style="border:none;border-top:1px dashed var(--border);margin:14px 0">
-      <h3 style="margin:4px 0 8px;font-size:14px;color:var(--primary)">🔍 未完成任务扫描（#16）</h3>
-      <p class="hint" style="margin:4px 0 8px">扫描全部游戏根目录 description.html，找出<b>含 .part 残留 / html 记录文件本地缺失</b>的未下载完 mod，整理成任务 json——可一键加入下载队列，或导出 json 存档/换端迁移（配合下载进度页「导入任务 json」）。</p>
-      <div class="row">
-        <button id="scanIncompleteBtn" type="button">扫描未完成任务</button>
-        <button id="scanIncompleteDlBtn" type="button" class="ghost" style="display:none">一键加入下载队列</button>
-        <button id="scanIncompleteExportBtn" type="button" class="ghost" style="display:none">导出任务 json</button>
-        <span class="status" id="scanIncompleteStatus"></span>
-      </div>
-      <div id="scanIncompleteResult" style="margin-top:8px"></div>
     </div>
 
     <!-- 2026-08-26 用户要求：文件夹合并放进设置里面（2026-08-31 用户要求：调整为卡片第一个小功能标题） -->
@@ -274,8 +263,22 @@ try {
       <div class="row">
         <input type="text" id="hashInput" placeholder="hash 或图片短名" style="width:340px">
         <button id="hashQueryBtn" type="button">查询</button>
-        <button id="hashRebuildBtn" type="button" class="ghost" title="下载了新 mod 后重建索引（启动时也会自动建）">重建索引</button>
+        <!-- 2026-09-02 用户要求：重建索引支持选游戏（索引按游戏分文件存 json/index/<游戏名>.json） -->
+        <select id="hashRebuildGame" title="选择要重建索引的游戏（默认全部）" style="max-width:230px">
+          <option value="">全部游戏</option>
+        </select>
+        <button id="hashRebuildBtn" type="button" class="ghost" title="下载了新 mod 后重建索引（启动时也会自动建）；选某游戏则只重建该游戏索引">重建索引</button>
       </div>
+      <!-- 2026-09-02 用户要求（#16）：未完成任务扫描并入重建索引——重建时顺带扫描，
+           找出含 .part 残留 / html 记录文件本地缺失的未下载完 mod，整理成任务 json -->
+      <div class="row" style="margin-top:6px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="hashRebuildScan" checked>
+          <span>重建时顺带扫描未完成任务（.part 残留 / 文件缺失 → 任务 json）</span>
+        </label>
+        <span class="status" id="scanIncompleteStatus"></span>
+      </div>
+      <div id="scanIncompleteResult" style="margin-top:8px"></div>
       <div class="status" id="hashStatus"></div>
       <div id="hashResult"></div>
       <hr style="border:none;border-top:1px dashed var(--border);margin:12px 0">
@@ -313,7 +316,7 @@ try {
 <!-- 2026-09-01 用户要求：保存设置改悬浮按钮（右下角，仅设置页显示） -->
 <button id="saveSettingsFab" type="button" title="保存设置">💾</button>
 
-<script src="app.js?v=20260831-opt"></script>
+<script src="app.js?v=20260902-index2"></script>
 
 <!-- 目录选择弹窗（设置页「读取本地选择」下载路径） -->
 <div class="modal-mask" id="browseMask" style="display:none">

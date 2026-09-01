@@ -5,7 +5,10 @@ server/sessions.json
 server/download_task.json
 server/search_cache.json
 server/search_task.json
-# hash 反查：本地表 + HTML 原名表（本机下载/反查记录，仅本部署可见；GB 信息表 json/gb-hash-index.json 正常提交）
+# hash 反查：索引改为按游戏分文件存 json/index/（含本地路径、运行态数据，整体忽略不入库）
+#   旧全局 3 文件（gb/local/html-name）首次启动自动迁移拆分后删除，不再使用
+json/index/
+json/gb-hash-index.json
 json/local-hash-index.json
 json/html-name-index.json
 node_modules/
@@ -33,3 +36,29 @@ server/*.log.bak-*
 # 本地 GitHub 推送凭据（仅本机，绝不上库）——由 scripts/git-push.sh 读取
 .git-push-token
 .git-credentials-local
+
+# 零依赖项目，不需要 package.json（用户明确要求）
+package.json
+package-lock.json
+# npm 下载产物（dsh-git-push 自动追加，2026-08-20）
+yarn.lock
+pnpm-lock.yaml
+bun.lock
+npm-debug.log*
+.npm/
+.pnpm-store/
+# 敏感字段文件（dsh-git-push 自动追加，2026-09-01）
+docs/gamebanana-cookie-userscript.user.js
+docs/gbmd-开发者文档-20260827.md
+docs/ui-template/README.md
+docs/ui-template/app.js
+docs/ui-template/login.html
+docs/ui-template/setup.html
+scripts/gamebanana-cookie-userscript.user.js
+server/app.js
+server/auth.js
+server/lib/downloader.js
+server/lib/gb-api.js
+server/public/app.js
+server/public/login.html
+server/public/setup.html

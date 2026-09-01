@@ -28,20 +28,26 @@ const path = require("path");
 
 const INDEX_TAG_ID = "gbmd-index";
 const JSON_DIR = process.env.GBMD_JSON_DIR ? path.resolve(process.env.GBMD_JSON_DIR) : path.join(__dirname, "..", "..", "json");
-const NAME_FILE = path.join(JSON_DIR, "html-name-index.json");
+const INDEX_DIR = path.join(JSON_DIR, "index"); // 2026-09-02 按游戏分文件后的索引目录
 
 let nameIndexCache = null; // { at, map } 懒加载 + 缓存（organize 高频调用时避免反复读盘）
 
+// 2026-09-02 索引改为 json/index/<游戏>.json（每文件含 gb/local/name 三块）——
+//   合并全部游戏的 name 块作为反查表（原 html-name-index.json 已迁移拆分删除）
 function loadNameIndex() {
   const now = Date.now();
   if (nameIndexCache && now - nameIndexCache.at < 60 * 1000) return nameIndexCache.map;
-  try {
-    const obj = JSON.parse(fs.readFileSync(NAME_FILE, "utf8"));
-    nameIndexCache = { at: now, map: new Map(Object.entries(obj || {})) };
-  } catch (_) {
-    nameIndexCache = { at: now, map: new Map() };
+  const map = new Map();
+  let files = [];
+  try { files = fs.readdirSync(INDEX_DIR).filter((f) => f.endsWith(".json")); } catch (_) {}
+  for (const f of files) {
+    try {
+      const obj = JSON.parse(fs.readFileSync(path.join(INDEX_DIR, f), "utf8"));
+      for (const [k, v] of Object.entries(obj.name || {})) if (!map.has(k)) map.set(k, v);
+    } catch (_) {}
   }
-  return nameIndexCache.map;
+  nameIndexCache = { at: now, map };
+  return map;
 }
 
 function parseIndexObj(html) {

@@ -79,7 +79,8 @@ node server/app.js
 │       └── hash-index.js      # HTML 反查三表（GB 线上表 + 本地表 + HTML 原名表）
 ├── json/
 │   ├── gamebanana.com.json.example  # 游戏配置示例（复制为 gamebanana.com.json 后填真实下载路径）
-│   └── gb-hash-index.json     # GB 线上信息表（hash → mod 信息，随仓库共享）
+│   ├── index/<游戏名>.json    # HTML 反查索引（每游戏一文件：GB 线上表 + 本地表 + HTML 原名表三块，git 忽略）
+│   └── role/<游戏名>.json     # 角色列表缓存（每游戏一文件）
 ├── mapping/                   # 每个游戏的仓库/角色映射（如 Genshin Impact.json）
 ├── scripts/git-push.sh        # GitHub 推送辅助（从项目本地 .git-push-token 读凭据，token 不入库）
 ├── scripts/gen-mapping.js     # 映射生成：按官方角色名单 + 磁盘目录反查，生成/重建 mapping/<游戏名>.json（默认 dryrun）
@@ -173,13 +174,13 @@ node server/app.js
 ## HTML 反查（三索引）
 
 网页「设置 → HTML 反查」：输入文件 MD5 **或图片原始短名**（GB 原名，如 `69b46e18405cc.jpg`），反查它属于哪个 mod。
-**三索引设计**：
+**三索引设计**（2026-09-02 起索引按游戏分文件存 `json/index/<游戏名>.json`，每文件含以下三块；文件名用 mapping/sanitizeName 清洗，文件内 game 保留原始名）：
 
-| 索引 | 文件 | 内容 | git |
-|---|---|---|---|
-| GB 线上信息表 | `json/gb-hash-index.json` | hash → mod 名/作者/游戏/链接/GB 文件名 | ✅ 随仓库共享 |
-| 本地信息表 | `json/local-hash-index.json` | hash → 本机实际下载目录/文件名 | ⛔ git 忽略 |
-| HTML 原名表 | `json/html-name-index.json` | GB 原名（图片短名/压缩包名）→ mod | ⛔ git 忽略 |
+| 索引 | 内容 | git |
+|---|---|---|
+| GB 线上信息表 | hash → mod 名/作者/游戏/链接/GB 文件名 | ⛔ 忽略（json/index/） |
+| 本地信息表 | hash → 本机实际下载目录/文件名 | ⛔ 忽略（json/index/） |
+| HTML 原名表 | GB 原名（图片短名/压缩包名）→ mod | ⛔ 忽略（json/index/） |
 
 **查询行为**：
 - **本地表命中**（本机下载过）→ 显示 mod 信息 + **本机实际目录**

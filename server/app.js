@@ -576,7 +576,11 @@ const server = http.createServer(async (req, res) => {
     if (method === "POST" && pathname === "/api/task/pause") return sendJson(res, 200, downloader.pauseTask());
     if (method === "POST" && pathname === "/api/task/resume") return sendJson(res, 200, downloader.resumeTask());
     if (method === "POST" && pathname === "/api/task/stop") return sendJson(res, 200, downloader.stopTask());
-    if (method === "POST" && pathname === "/api/task/retry-failed") return sendJson(res, 200, downloader.retryFailed());
+    // 2026-09-01 支持单项重试：body 传 { url, path } 只重试匹配项；空 body = 全量重试失败项
+    if (method === "POST" && pathname === "/api/task/retry-failed") {
+      const body = await readBody(req);
+      return sendJson(res, 200, downloader.retryFailed(body || {}));
+    }
     if (method === "POST" && pathname === "/api/task/concurrency") {
       const body = await readBody(req);
       return sendJson(res, 200, downloader.setConcurrency(body.concurrency));

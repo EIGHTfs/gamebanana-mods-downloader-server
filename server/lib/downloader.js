@@ -1604,20 +1604,40 @@ function skipAllFailed() {
   return { ok: true, skipped: n, message: n ? `已清除 ${n} 个失败项（下次请求可再下载）` : "无失败项" };
 }
 
-function retryFailed() {
+// 2026-09-01 重试重构（用户反馈三个 bug）：
+//   ① 单个任务重试失败会所有任务都重试 → 支持单项重试（传 url/path 只重试匹配项）
+//   ② 不在下载列表的错误也重试 → 排除 type:"error"/"skipped"（构建失败/去重跳过/图床不可达，
+//      重试无意义）；只重试「在下载列表且确实失败」的项
+//   ③ 任务列表没开始的也重试 → 任务 running/preparing 时无结果的项 = 还没开始，
+//      不重试（本来就会继续下载）；仅任务已结束（done/paused）时的无结果残留（卡住）才重试
+//   ④ 重试没有重置任务列表状态 → 清 task.results 旧快照、重算 doneCount/currentIndex，
+//      前端 resultOf 不再回退读到旧失败结果
+// 调用：retryFailed() 全量；retryFailed({ url, path }) 单项
+function retryFailed(q = {}) {
   if (!task) return { ok: false, error: "无下载任务" };
+  const wantUrl = q && q.url ? String(q.url).trim() : "";
+  const wantPath = q && q.path ? String(q.path).trim() : "";
+  const single = !!(wantUrl || wantPath);
   const active = new Set((task.activeItems || []).map((a) => a.idx));
+  const stillRunning = task.status === "running" || task.status === "preparing";
   const failedIdx = [];
   for (let i = 0; i < (task.items || []).length; i++) {
     const item = task.items[i];
     if (!item || !item.path || item._skip) continue;
+    if (item.type === "error" || item.type === "skipped") continue; // 不在下载列表的错误/跳过不重试
+    if (single) {
+      const hit = (wantPath && item.path && String(item.path) === wantPath) ||
+                  (wantUrl && item.url && String(item.url) === wantUrl);
+      if (!hit) continue; // 单项重试：只处理匹配项
+    }
     if (active.has(i)) continue;
     const r = resultAt(i);
     if (r && r.ok && !r.skipped) continue; // 已成功
     if (r && r.skipped) continue;          // 已跳过
-    failedIdx.push(i); // 失败 或 无结果（卡住：done 任务重试后的残留）→ 重新入队
+    if (!r && stillRunning) continue;      // 未开始（任务运行中无结果）→ 不重试，本来就会继续下载
+    failedIdx.push(i); // 确实失败 或 卡住（任务已结束的无结果残留）→ 重新入队
   }
-  if (!failedIdx.length) return { ok: true, retried: 0, message: "无失败项可重试" };
+  if (!failedIdx.length) return { ok: true, retried: 0, message: single ? "无匹配的失败项" : "无失败项可重试" };
   failedIdx.sort((a, b) => a - b);
   let minIdx = Infinity;
   for (const i of failedIdx) {
@@ -1631,11 +1651,17 @@ function retryFailed() {
   task.status = "running";
   task.pause = false;
   task.abort = false;
-  task.message = `已重新入队 ${failedIdx.length} 个失败项`;
+  // 2026-09-01 重置任务列表状态：清旧 results 快照 + 重算计数（前端 resultOf 会回退读 task.results）
+  task.results = [];
+  // 用 task.resultsMap（持久真相，重启后 resultsByIndex 是空的）重算完成数，
+  // 而非内存态 resultsByIndex.size——否则重启后重试会误显示 0 完成
+  task.doneCount = Object.keys(task.resultsMap || {}).length;
+  task.currentIndex = Math.min(task.currentIndex || 0, minIdx);
+  task.message = single ? `已重新入队 1 个失败项` : `已重新入队 ${failedIdx.length} 个失败项`;
   task.updatedAt = Date.now();
   saveTask();
   runDownloadLoop();
-  return { ok: true, retried: failedIdx.length, message: `已重新入队 ${failedIdx.length} 个失败项` };
+  return { ok: true, retried: failedIdx.length, message: task.message };
 }
 
 // 启动时恢复任务（2026-08-26 修复：重启后下载列表不应消失）

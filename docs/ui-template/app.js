@@ -492,7 +492,8 @@ function bindProgress() {
     const retryBtn = ev.target.closest(".mm-retry-btn");
     if (retryBtn) {
       ev.preventDefault();
-      const r = await api("/api/task/retry-failed", "POST", {});
+      // 2026-09-01 修复（用户反馈：单任务重试变成全部重试）——行级按钮只重试这一项
+      const r = await api("/api/task/retry-failed", "POST", { url: retryBtn.dataset.url || "", path: retryBtn.dataset.path || "" });
       if (r && r.ok) { if (r.message) showFeedback(r.message, "ok"); try { const t = await api("/api/task"); renderTask(t.task); } catch (_) {} }
       else showFeedback((r && r.error) || "重试失败", "err");
       return;

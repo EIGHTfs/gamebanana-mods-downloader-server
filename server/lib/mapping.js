@@ -18,6 +18,29 @@
 const path = require("path");
 const cfg = require("../config");
 
+// ---------- 非法字符映射（最高优先级，2026-09-02）----------
+// mapping/<游戏名>.json 顶层可选字段 illegalChars：{ 非法字符: 合规字符 }，
+// 生成目录名/文件名时最先应用（先于 roles/variants/warehouses 映射）。
+// 例：{ ":": "：" } → 半角冒号(Windows 非法，触发 8.3 短名) 换成全角冒号。
+function illegalCharsOf(game) {
+  try {
+    const m = cfg.readGameMapping(game);
+    return (m && m.illegalChars) || {};
+  } catch (_) {
+    return {};
+  }
+}
+
+// 应用非法字符映射：对 str 中每个 key 做全局替换（split/join 避开正则特殊字符）
+function applyIllegalChars(str, map) {
+  let s = String(str == null ? "" : str);
+  for (const [k, v] of Object.entries(map || {})) {
+    if (!k) continue;
+    s = s.split(k).join(String(v));
+  }
+  return s;
+}
+
 // ---------- 名称合规化 ----------
 // 下载不改原始文件名，除非文件名含 Windows/Linux 文件系统非法字符 → 非法字符用空格替换
 // 非法字符：< > : " / \ | ? * 和控制字符（/ \ 是路径分隔符也必须处理）
@@ -116,6 +139,7 @@ function itemDirName(category, game) {
   if (!gameMap) return en;
   const roles = (gameMap.roles) || {};
   const variants = (gameMap.variants) || {};
+  const illegal = gameMap.illegalChars || {}; // 非法字符映射（最高优先级，最后清洗输出）
   const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");
   const enN = norm(en);
   let zh = roles[en] || "";
@@ -148,9 +172,9 @@ function itemDirName(category, game) {
         }
       }
     }
-    return `${canonEn} – ${zh}`;
+    return applyIllegalChars(`${canonEn} – ${zh}`, illegal); // 最高优先级：清洗目录名里的非法字符
   }
-  return en;
+  return applyIllegalChars(en, illegal);
 }
 
 // 从角色映射判断某名字是否是「角色/具体项」（用于 Skins 层跳过后的处理）
@@ -312,5 +336,7 @@ module.exports = {
   itemDirName,
   roleZhOf,
   isKnownWarehouse,
-  buildTargetDir
+  buildTargetDir,
+  illegalCharsOf,
+  applyIllegalChars
 };

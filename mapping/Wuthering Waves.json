@@ -1,4 +1,5 @@
 {
+  "illegalChars": { ": ": "：" },
   "warehouses": {
     "characters": "共鸣者",
     "weapons": "武器",

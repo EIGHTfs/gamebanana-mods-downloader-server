@@ -252,7 +252,8 @@ if (droppedKeys.length) {
 }
 
 // ---------- 输出 ----------
-const out = { warehouses: oldMap.warehouses || {}, roles, variants };
+// illegalChars 是手工维护的非法字符映射（最高优先级），重生成时保留旧值不覆盖
+const out = { illegalChars: oldMap.illegalChars || {}, warehouses: oldMap.warehouses || {}, roles, variants };
 const outPath = outArg || path.join(MAPPING_DIR, `${gameArg}.json`);
 const json = JSON.stringify(out, null, 2) + "\n";
 

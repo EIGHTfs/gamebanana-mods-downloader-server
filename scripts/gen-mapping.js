@@ -101,6 +101,18 @@ function resolveEn(short, official) {
   return null; // 0 或 ≥2 → 舍弃
 }
 
+// 双向解析（2026-09-02 修复）：isRelated 是「短名→全名」单向（词级/前缀/后缀），
+//   但旧映射里英文值是「更长/别名」（如 Columbina Hyposelenia → 官方 Columbina）时单向失效。
+//   双向检查（short→full 或 full→short 任一命中）后唯一命中才收，仍宁缺毋滥。
+function resolveEnBi(short, official) {
+  const hit = resolveEn(short, official);
+  if (hit) return hit;
+  const sn = normEn(short);
+  if (!sn) return null;
+  const cands = official.filter((o) => isRelated(o, short) || isRelated(short, o));
+  return cands.length === 1 ? cands[0] : null;
+}
+
 // ---------- 读取输入 ----------
 function readJson(file) {
   try {
@@ -214,63 +226,69 @@ function zhFor(en) {
 }
 
 // ---------- 生成 roles / variants ----------
+// 2026-09-02 规范（用户指导的绝区零 JSON 为基准）：variants = 规范中文 → 数组，
+//   数组含「中文昵称 + 规范中文 + 英文变体」，key 只用规范中文（别名进数组，不占 key）。
+// 铁律：旧 variants 数组是手工维护的权威基线 → 原样保留（如「丽娜」「rina」不能丢）；
+//   新角色/官方名变化才在其上追加，宁缺毋滥只约束「新增」，不删旧条目。
 const roles = {};
-const variants = {};
+const variants = {}; // 累积用：zh -> Set（同一 zh 可能有多个官方 en，merge 不覆盖）
 const notes = []; // dryrun 提示（歧义/无法解析/兜底）
 
 for (const en of official) {
   const zh = zhFor(en);
   roles[en] = zh;
+  if (!variants[zh]) variants[zh] = new Set();
 
-  const arr = [zh, en];
-  const zhN = normZh(zh);
+  // ① 旧 variants[zh] 数组原样保留（手工维护的中文昵称/英文昵称，如 丽娜/rina）
+  const oldArr = oldVariants[zh];
+  if (Array.isArray(oldArr)) for (const x of oldArr) variants[zh].add(String(x).trim());
+  else if (oldArr != null) variants[zh].add(String(oldArr).trim());
 
-  // 2026-09-02 用户要求：生成脚本处理映射文件里的非法字符。
-  //   官方英文名含非法字符（半角冒号等）→ 自动补「清洗后的全角变体」进 variants，
-  //   使合并/反查/搜索同时支持半角与全角两种写法（目录不被 8.3 短名化）。
+  // ② 规范中文 + 官方英文名
+  variants[zh].add(zh);
+  variants[zh].add(en);
+
+  // ③ 官方英文名含非法字符（半角冒号等）→ 补清洗后的全角变体（2026-09-02 用户要求）
   const cleaned = cleanedVariantOf(en);
-  if (cleaned && !arr.includes(cleaned)) arr.push(cleaned);
+  if (cleaned) variants[zh].add(cleaned);
 
-  // 旧 roles 的英文 key：唯一命中官方名且非全等 → 变体
+  // ④ 旧 roles 的英文 key：唯一命中官方名且非全等 → 变体
   for (const [k, v] of Object.entries(oldRoles)) {
     if (normEn(k) === normEn(en)) continue; // 就是它自己
     const hit = resolveEn(k, official);
     if (hit === en) {
-      if (!arr.includes(k)) arr.push(k);
+      variants[zh].add(k);
     } else if (hit === null && String(v) === zh) {
       // 未唯一命中官方名，但中文相同 → 中文简写可收（如旧「安东」→ 安东·伊万诺夫）
-      if (!arr.includes(k)) arr.push(k);
+      variants[zh].add(k);
     }
   }
 
-  // 旧 variants 的中文 key / 数组值：中文 key 反查英文唯一命中此角色 → 收中文简写
+  // ⑤ 旧 variants 别名 key（≠ 规范中文）→ 其英文值双向唯一解析到本角色 → 别名收进数组
   for (const [vk, vv] of Object.entries(oldVariants)) {
+    if (vk === zh) continue; // 已在 ①
     const arrV = Array.isArray(vv) ? vv : [vv];
-    // 中文 key 本身是变体（如「安东」）
-    if (normZh(vk) === zhN && !arr.includes(vk)) {
-      // 只有它能解析到该官方名（或其英文值能解析）才收，否则宁缺毋滥
-      const enInArr = arrV.find((x) => /[a-z]/i.test(x));
-      if (resolveEn(enInArr || vk, official) === en || resolveEn(vk, official) === en) {
-        arr.push(vk);
-      }
-    }
-    // 数组里的中文短名（如「安东」在 安东·伊万诺夫 的数组里）
-    for (const x of arrV) {
-      if (!/[a-z]/i.test(x)) continue; // 只处理英文值
-      if (resolveEn(x, official) === en && !arr.includes(x)) arr.push(x);
+    const enInArr = arrV.find((x) => /[a-z]/i.test(x));
+    // 英文值可能是更长的别名（Columbina Hyposelenia → Columbina），用双向解析
+    if (enInArr && resolveEnBi(enInArr, official) === en) {
+      variants[zh].add(vk);
+      for (const x of arrV) variants[zh].add(String(x).trim());
     }
   }
 
-  // 规范中文「·」前段（如 安东·伊万诺夫 → 安东）且旧 variants 有同值 → 收
+  // ⑥ 规范中文「·」前段（如 安东·伊万诺夫 → 安东）且旧 variants 有同值 → 收
   if (zh.includes("·")) {
     const head = zh.split("·")[0].trim();
     if (head && head !== zh && (oldVariants[head] !== undefined || variantZhOf.has(head))) {
-      if (!arr.includes(head)) arr.push(head);
+      variants[zh].add(head);
     }
   }
+}
 
-  // 去重 + 排序：规范中文在前，其余中文其次，英文按字母序在后
-  const uniq = [...new Set(arr.map((x) => String(x).trim()).filter(Boolean))];
+// 排序输出：规范中文在前，其余中文其次，英文按字母序在后
+for (const [zh, set] of Object.entries(variants)) {
+  const zhN = normZh(zh);
+  const uniq = [...new Set([...set].map((x) => String(x).trim()).filter(Boolean))];
   const zhItems = uniq.filter((x) => !/[a-z]/i.test(x));
   const enItems = uniq.filter((x) => /[a-z]/i.test(x)).sort((a, b) => a.localeCompare(b));
   const zhSorted = [zh, ...zhItems.filter((x) => x !== zh)].sort((a, b) => {

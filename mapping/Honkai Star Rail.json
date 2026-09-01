@@ -14,6 +14,8 @@
   "roles": {
     "Acheron": "黄泉",
     "Aglaea": "阿格莱雅",
+    "Anaxa": "那刻夏",
+    "Archer": "Archer",
     "Argenti": "银枝",
     "Arlan": "阿兰",
     "Ashveil": "不死途",
@@ -27,9 +29,13 @@
     "Bronya Zaychik": "布洛妮娅·扎伊切克",
     "Caelus": "穹",
     "Castorice": "遐蝶",
+    "Cerydra": "刻律德菈",
+    "Cipher": "赛飞儿",
     "Clara": "克拉拉",
+    "Cyrene": "昔涟",
     "Dan Heng": "丹恒",
     "Dan Heng Imbibitor Lunae": "丹恒·饮月",
+    "Dan Heng Permansor Terrae": "丹恒·腾荒",
     "Dr. Ratio": "真理医生",
     "Evanescia": "绯英",
     "Evernight": "长夜月",
@@ -40,6 +46,7 @@
     "Fuxaun": "符玄",
     "Gallagher": "加拉赫",
     "Gepard": "杰帕德",
+    "Gilgamesh": "吉尔伽美什",
     "Guinaifen": "桂乃芬",
     "Hanya": "寒鸦",
     "Herta": "黑塔",
@@ -48,8 +55,10 @@
     "Hook": "虎克",
     "Huohuo": "霍霍",
     "Hyacine": "风堇",
+    "Hysilens": "海瑟音",
     "Jade": "翡翠",
     "Jiao qiu": "椒丘",
+    "Jiaoqiu": "椒丘",
     "Jing Yuan": "景元",
     "Jingliu": "镜流",
     "Kafka": "卡芙卡",
@@ -58,177 +67,469 @@
     "Luocha": "罗刹",
     "Lynx": "玲可",
     "March 7th": "三月七",
+    "March 7th Hunt": "三月七·巡猎",
     "Misha": "米沙",
+    "Mortenax Blade": "千冶·刃",
     "Moze": "貊泽",
     "Mydei": "万敌",
     "Natasa": "娜塔莎",
+    "Natasha": "娜塔莎",
+    "Pearl": "真珠",
     "Pela": "佩拉",
+    "Phainon": "白厄",
     "Qingque": "青雀",
+    "Rappa": "乱破",
+    "Rin": "远坂凛",
+    "Rin Tohsaka": "远坂凛",
     "Robin": "知更鸟",
+    "Robin Summeretto": "Robin Summeretto",
     "Ruan Mei": "阮·梅",
+    "Saber": "阿尔托莉雅",
     "Sampo": "桑博",
     "Seele": "希儿",
     "Seele Vollerei": "希儿·芙乐艾",
     "Serval": "希露瓦",
     "Silver Wolf": "银狼",
+    "Silver Wolf Lv.999": "银狼·Lv.999",
     "Sparkle": "花火",
     "Sparxie": "火花",
     "Stelle": "星",
     "Sunday": "星期日",
     "Sushang": "李素裳",
     "The Dahlia": "大丽花",
+    "The Herta": "大黑塔",
     "Tingyun": "停云",
     "Topaz": "托帕",
     "Trailblazer": "开拓者",
+    "Tribbie": "缇宝",
     "Welt": "瓦尔特",
     "Welt Yang": "瓦尔特·杨",
     "Xueyi": "雪衣",
+    "Yanqing": "彦卿",
     "YanQing": "彦卿",
     "Yao Guang": "爻光",
     "Yingxing": "应星",
+    "Yukong": "驭空",
     "YuKong": "驭空",
-    "Yunli": "云璃",
-    "Cerydra": "刻律德菈",
-    "Cipher": "赛飞儿",
-    "The Herta": "大黑塔",
-    "Hysilens": "海瑟音",
-    "Tribbie": "缇宝",
-    "Anaxa": "那刻夏",
-    "Phainon": "白厄",
-    "Rappa": "乱破",
-    "March 7th Hunt": "三月七·巡猎",
-    "Natasha": "娜塔莎",
-    "Cyrene": "昔涟",
-    "Archer": "Archer",
-    "Rin Tohsaka": "远坂凛",
-    "Rin": "远坂凛",
-    "Pearl": "真珠",
-    "Dan Heng Permansor Terrae": "丹恒·腾荒",
-    "Gilgamesh": "吉尔伽美什",
-    "Saber": "阿尔托莉雅",
-    "Mortenax Blade": "千冶·刃",
-    "Silver Wolf Lv.999": "银狼·Lv.999"
+    "Yunli": "云璃"
   },
   "variants": {
-    "黄泉": "Acheron",
-    "阿格莱雅": "Aglaea",
-    "银枝": "Argenti",
-    "阿兰": "Arlan",
-    "不死途": "Ashveil",
-    "艾丝妲": "Asta",
-    "砂金": "Aventurine",
-    "白露": "Bailu",
-    "黑天鹅": "Black Swan",
-    "刃": "Blade",
-    "波提欧": "Boothill",
-    "布洛妮娅": "Bronya",
-    "布洛妮娅·扎伊切克": "Bronya Zaychik",
-    "穹": "Caelus",
-    "遐蝶": "Castorice",
-    "克拉拉": "Clara",
-    "丹恒": "Dan Heng",
-    "丹恒·饮月": "Dan Heng Imbibitor Lunae",
-    "drratio": "Dr. Ratio",
-    "真理医生": "Dr. Ratio",
-    "绯英": "Evanescia",
-    "长夜月": "Evernight",
-    "飞霄": "Feixiao",
-    "流萤": "Firefly",
-    "符玄": "Fuxaun",
-    "忘归人": "Fugue",
-    "加拉赫": "Gallagher",
-    "杰帕德": "Gepard",
-    "桂乃芬": "Guinaifen",
-    "寒鸦": "Hanya",
-    "黑塔": "Herta",
-    "姬子": "Himeko",
-    "姬子•启行": "Himeko Nova",
-    "虎克": "Hook",
-    "霍霍": "Huohuo",
-    "风堇": "Hyacine",
-    "翡翠": "Jade",
-    "椒丘": "Jiao qiu",
-    "景元": "JingYuan",
-    "镜流": "Jingliu",
-    "卡芙卡": "Kafka",
-    "灵砂": "Lingsha",
-    "卢卡": "Luka",
-    "罗刹": "Luocha",
-    "玲可": "Lynx",
-    "三月七": "March 7th",
-    "米沙": "Misha",
-    "貊泽": "Moze",
-    "万敌": "Mydei",
-    "娜塔莎": "Natasha",
-    "numby": "Topaz",
-    "佩拉": "Pela",
-    "青雀": "Qingque",
-    "知更鸟": "Robin",
-    "阮·梅": "Ruanmei",
-    "桑博": "Sampo",
-    "希儿": "Seele",
-    "希儿·芙乐艾": "Seele Vollerei",
-    "希露瓦": "Serval",
-    "银狼": "Silver Wolf",
-    "花火": "Sparkle",
-    "火花": "Sparxie",
-    "星": "Stelle",
-    "星期日": "Sunday",
-    "李素裳": "Sushang",
-    "大丽花": "The Dahlia",
-    "停云": "Tingyun",
-    "托帕": "Topaz",
-    "开拓者": "Trailblazer",
-    "瓦尔特": "Welt",
-    "瓦尔特·杨": "Welt Yang",
-    "雪衣": "Xueyi",
-    "彦卿": "YanQing",
-    "爻光": "Yao Guang",
-    "应星": "Yingxing",
-    "驭空": "Yukong",
-    "云璃": "Yunli",
-    "刻律德菈": "Cerydra",
-    "赛飞儿": "Cipher",
-    "大黑塔": "The Herta",
-    "海瑟音": "Hysilens",
-    "缇宝": "Tribbie",
-    "那刻夏": "Anaxa",
-    "白厄": "Phainon",
-    "乱破": "Rappa",
-    "三月七·巡猎": "March 7th Hunt",
-    "昔涟": "Cyrene",
-    "tribble": "Tribbie",
-    "hanabi": "Sparkle",
-    "sparklehanabi": "Sparkle",
-    "thehertamod": "The Herta",
-    "blackswannudemod": "Black Swan",
-    "silverwolfofstratagems": "Silver Wolf",
-    "bronyarand": "Bronya",
-    "bronyas": "Bronya",
-    "bronyanudemod": "Bronya",
-    "qingquenudemod": "Qingque",
-    "topaznudemod": "Topaz",
-    "xueyinudemod": "Xueyi",
-    "sushangnudemod": "Sushang",
-    "seelenudemod": "Seele",
-    "hanyanudemod": "Hanya",
-    "yukongmod": "Yukong",
-    "kafkamod": "Kafka",
-    "danhenglunae": "Dan Heng Imbibitor Lunae",
-    "march7": "March 7th",
-    "jinglius": "Jingliu",
-    "guinafen": "Guinaifen",
-    "林尼": "Rin",
-    "远坂凛": "Rin",
-    "sam": "Firefly",
-    "夏蝶": "Castorice",
-    "xia die": "Castorice",
-    "瑶光": "Yao Guang",
-    "真珠": "Pearl",
-    "丹恒·腾荒": "Dan Heng Permansor Terrae",
-    "吉尔伽美什": "Gilgamesh",
-    "阿尔托莉雅": "Saber",
-    "千冶·刃": "Mortenax Blade",
-    "银狼·Lv.999": "Silver Wolf Lv.999"
+    "黄泉": [
+      "黄泉",
+      "Acheron"
+    ],
+    "阿格莱雅": [
+      "阿格莱雅",
+      "Aglaea"
+    ],
+    "那刻夏": [
+      "那刻夏",
+      "Anaxa"
+    ],
+    "Archer": [
+      "Archer"
+    ],
+    "银枝": [
+      "银枝",
+      "Argenti"
+    ],
+    "阿兰": [
+      "阿兰",
+      "Arlan"
+    ],
+    "不死途": [
+      "不死途",
+      "Ashveil"
+    ],
+    "艾丝妲": [
+      "艾丝妲",
+      "Asta"
+    ],
+    "砂金": [
+      "砂金",
+      "Aventurine"
+    ],
+    "白露": [
+      "白露",
+      "Bailu"
+    ],
+    "黑天鹅": [
+      "黑天鹅",
+      "Black Swan",
+      "blackswannudemod"
+    ],
+    "刃": [
+      "刃",
+      "Blade"
+    ],
+    "波提欧": [
+      "波提欧",
+      "Boothill"
+    ],
+    "布洛妮娅": [
+      "布洛妮娅",
+      "Bronya",
+      "bronyanudemod",
+      "bronyarand",
+      "bronyas"
+    ],
+    "布洛妮娅·扎伊切克": [
+      "布洛妮娅·扎伊切克",
+      "布洛妮娅",
+      "Bronya Zaychik"
+    ],
+    "穹": [
+      "穹",
+      "Caelus"
+    ],
+    "遐蝶": [
+      "遐蝶",
+      "夏蝶",
+      "Castorice",
+      "xia die"
+    ],
+    "刻律德菈": [
+      "刻律德菈",
+      "Cerydra"
+    ],
+    "赛飞儿": [
+      "赛飞儿",
+      "Cipher"
+    ],
+    "克拉拉": [
+      "克拉拉",
+      "Clara"
+    ],
+    "昔涟": [
+      "昔涟",
+      "Cyrene"
+    ],
+    "丹恒": [
+      "丹恒",
+      "Dan Heng"
+    ],
+    "丹恒·饮月": [
+      "丹恒·饮月",
+      "丹恒",
+      "Dan Heng Imbibitor Lunae",
+      "danhenglunae"
+    ],
+    "丹恒·腾荒": [
+      "丹恒·腾荒",
+      "丹恒",
+      "Dan Heng Permansor Terrae"
+    ],
+    "真理医生": [
+      "真理医生",
+      "Dr. Ratio",
+      "drratio"
+    ],
+    "绯英": [
+      "绯英",
+      "Evanescia"
+    ],
+    "长夜月": [
+      "长夜月",
+      "Evernight"
+    ],
+    "飞霄": [
+      "飞霄",
+      "Feixiao"
+    ],
+    "流萤": [
+      "流萤",
+      "Firefly",
+      "sam"
+    ],
+    "符玄": [
+      "符玄",
+      "Fu Xuan",
+      "Fuxaun"
+    ],
+    "忘归人": [
+      "忘归人",
+      "Fugue"
+    ],
+    "加拉赫": [
+      "加拉赫",
+      "Gallagher"
+    ],
+    "杰帕德": [
+      "杰帕德",
+      "Gepard"
+    ],
+    "吉尔伽美什": [
+      "吉尔伽美什",
+      "Gilgamesh"
+    ],
+    "桂乃芬": [
+      "桂乃芬",
+      "guinafen",
+      "Guinaifen"
+    ],
+    "寒鸦": [
+      "寒鸦",
+      "Hanya",
+      "hanyanudemod"
+    ],
+    "黑塔": [
+      "黑塔",
+      "Herta"
+    ],
+    "姬子": [
+      "姬子",
+      "Himeko"
+    ],
+    "姬子•启行": [
+      "姬子•启行",
+      "Himeko Nova"
+    ],
+    "虎克": [
+      "虎克",
+      "Hook"
+    ],
+    "霍霍": [
+      "霍霍",
+      "Huohuo"
+    ],
+    "风堇": [
+      "风堇",
+      "Hyacine"
+    ],
+    "海瑟音": [
+      "海瑟音",
+      "Hysilens"
+    ],
+    "翡翠": [
+      "翡翠",
+      "Jade"
+    ],
+    "椒丘": [
+      "椒丘",
+      "Jiao qiu",
+      "Jiaoqiu"
+    ],
+    "景元": [
+      "景元",
+      "Jing Yuan",
+      "JingYuan"
+    ],
+    "镜流": [
+      "镜流",
+      "Jingliu",
+      "jinglius"
+    ],
+    "卡芙卡": [
+      "卡芙卡",
+      "Kafka",
+      "kafkamod"
+    ],
+    "灵砂": [
+      "灵砂",
+      "Lingsha"
+    ],
+    "卢卡": [
+      "卢卡",
+      "Luka"
+    ],
+    "罗刹": [
+      "罗刹",
+      "Luocha"
+    ],
+    "玲可": [
+      "玲可",
+      "Lynx"
+    ],
+    "三月七": [
+      "三月七",
+      "March 7th",
+      "march7"
+    ],
+    "三月七·巡猎": [
+      "三月七·巡猎",
+      "三月七",
+      "March 7th Hunt"
+    ],
+    "米沙": [
+      "米沙",
+      "Misha"
+    ],
+    "千冶·刃": [
+      "千冶·刃",
+      "Mortenax Blade"
+    ],
+    "貊泽": [
+      "貊泽",
+      "Moze"
+    ],
+    "万敌": [
+      "万敌",
+      "Mydei"
+    ],
+    "娜塔莎": [
+      "娜塔莎",
+      "Natasa",
+      "Natasha"
+    ],
+    "真珠": [
+      "真珠",
+      "Pearl"
+    ],
+    "佩拉": [
+      "佩拉",
+      "Pela"
+    ],
+    "白厄": [
+      "白厄",
+      "Phainon"
+    ],
+    "青雀": [
+      "青雀",
+      "Qingque",
+      "qingquenudemod"
+    ],
+    "乱破": [
+      "乱破",
+      "Rappa"
+    ],
+    "远坂凛": [
+      "远坂凛",
+      "林尼",
+      "Rin",
+      "Rin Tohsaka"
+    ],
+    "知更鸟": [
+      "知更鸟",
+      "Robin"
+    ],
+    "Robin Summeretto": [
+      "Robin Summeretto"
+    ],
+    "阮·梅": [
+      "阮·梅",
+      "Ruan Mei",
+      "Ruanmei"
+    ],
+    "阿尔托莉雅": [
+      "阿尔托莉雅",
+      "Saber"
+    ],
+    "桑博": [
+      "桑博",
+      "Sampo"
+    ],
+    "希儿": [
+      "希儿",
+      "Seele",
+      "seelenudemod"
+    ],
+    "希儿·芙乐艾": [
+      "希儿·芙乐艾",
+      "希儿",
+      "Seele Vollerei"
+    ],
+    "希露瓦": [
+      "希露瓦",
+      "Serval"
+    ],
+    "银狼": [
+      "银狼",
+      "Silver Wolf",
+      "silverwolfofstratagems"
+    ],
+    "银狼·Lv.999": [
+      "银狼·Lv.999",
+      "银狼",
+      "Silver Wolf Lv.999"
+    ],
+    "花火": [
+      "花火",
+      "hanabi",
+      "Sparkle",
+      "sparklehanabi"
+    ],
+    "火花": [
+      "火花",
+      "Sparxie"
+    ],
+    "星": [
+      "星",
+      "Stelle"
+    ],
+    "星期日": [
+      "星期日",
+      "Sunday"
+    ],
+    "李素裳": [
+      "李素裳",
+      "Sushang",
+      "sushangnudemod"
+    ],
+    "大丽花": [
+      "大丽花",
+      "The Dahlia"
+    ],
+    "大黑塔": [
+      "大黑塔",
+      "The Herta",
+      "thehertamod"
+    ],
+    "停云": [
+      "停云",
+      "Tingyun"
+    ],
+    "托帕": [
+      "托帕",
+      "numby",
+      "Topaz",
+      "topaznudemod"
+    ],
+    "开拓者": [
+      "开拓者",
+      "Trailblazer"
+    ],
+    "缇宝": [
+      "缇宝",
+      "Tribbie",
+      "tribble"
+    ],
+    "瓦尔特": [
+      "瓦尔特",
+      "Welt"
+    ],
+    "瓦尔特·杨": [
+      "瓦尔特·杨",
+      "瓦尔特",
+      "Welt Yang"
+    ],
+    "雪衣": [
+      "雪衣",
+      "Xueyi",
+      "xueyinudemod"
+    ],
+    "彦卿": [
+      "彦卿",
+      "Yanqing",
+      "YanQing"
+    ],
+    "爻光": [
+      "爻光",
+      "瑶光",
+      "Yao Guang"
+    ],
+    "应星": [
+      "应星",
+      "Yingxing"
+    ],
+    "驭空": [
+      "驭空",
+      "Yukong",
+      "YuKong",
+      "yukongmod"
+    ],
+    "云璃": [
+      "云璃",
+      "Yunli"
+    ]
   }
 }

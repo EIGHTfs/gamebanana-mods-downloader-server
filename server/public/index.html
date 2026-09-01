@@ -278,6 +278,11 @@ try {
         </label>
         <span class="status" id="scanIncompleteStatus"></span>
       </div>
+      <!-- 2026-09-02 用户要求：导出按钮固定放这儿，扫描出 json 数据后才可点击（无数据禁用） -->
+      <div class="row" style="margin-top:6px">
+        <button id="scanIncompleteDlBtn" type="button" class="ghost" disabled title="扫描出未完成任务后可一键加入下载队列">一键加入下载队列</button>
+        <button id="scanIncompleteExportBtn" type="button" class="ghost" disabled title="扫描出任务 json 后可导出保存/换端迁移">导出任务 json</button>
+      </div>
       <div id="scanIncompleteResult" style="margin-top:8px"></div>
       <div class="status" id="hashStatus"></div>
       <div id="hashResult"></div>

@@ -155,6 +155,26 @@ const MOCK_ROUTES = [
     note: "真实返回：{ ok, message? }（POST）",
   },
   {
+    match: (p) => p === "/api/task/export",
+    get: () => ({ ok: true, taskJson: { schema: "gbmd-tasks-v1", exportedAt: new Date().toISOString(), count: 0, tasks: [] } }),
+    note: "真实返回：{ ok, taskJson:{ schema, exportedAt, count, tasks:[{url,modId,name,author,game}] } }",
+  },
+  {
+    match: (p) => p === "/api/task/import",
+    get: () => ({ ok: true, imported: 0 }),
+    note: "真实返回：{ ok, imported, message? }（POST，body {json}，含 /api/scan-incomplete 导出的 gbmd-tasks-v1 结构）",
+  },
+  {
+    match: (p) => p === "/api/scan-incomplete",
+    get: () => ({ ok: true, count: 0, links: [], taskJson: { schema: "gbmd-tasks-v1", exportedAt: new Date().toISOString(), count: 0, tasks: [] } }),
+    note: "真实返回：{ ok, count, links, taskJson }（POST，扫描含 .part 残留 / html 记录文件本地缺失的未下载完 mod；前端存有 taskJson 后启用导出/一键加入按钮）",
+  },
+  {
+    match: (p) => p === "/api/scan-incomplete/download",
+    get: () => ({ ok: true, started: true, count: 0 }),
+    note: "真实返回：{ ok, started, count, task }（POST，body {links} 把未完成任务加入下载队列）",
+  },
+  {
     match: (p) => p === "/api/task/concurrency",
     get: () => ({ ok: true, concurrency: 3 }),
     note: "真实返回：{ ok, concurrency }（POST，body {concurrency}）",
@@ -235,12 +255,12 @@ const MOCK_ROUTES = [
   {
     match: (p) => p === "/api/hash-rebuild",
     get: () => ({ ok: true }),
-    note: "真实返回：{ ok }（POST，后台重建索引，轮询 /api/hash-index-status）",
+    note: "真实返回：{ ok }（POST，后台重建索引，body {game} 指定只重建该游戏/空=全部，轮询 /api/hash-index-status）",
   },
   {
     match: (p) => p === "/api/hash-index-status",
-    get: () => ({ ok: true, running: false, gb: 0, local: 0, htmls: 0 }),
-    note: "真实返回：{ ok, running, gb, local, htmls }",
+    get: () => ({ ok: true, running: false, lastAt: null, lastMs: 0, error: null, gb: 0, local: 0, name: 0, games: {}, total: 0 }),
+    note: "真实返回：{ ok, running, lastAt, lastMs, error?, gb, local, name, games:{<游戏名>:{gb,local,name}}, total }（索引按游戏分文件存 json/index/<游戏名>.json）",
   },
   {
     match: (p) => p.startsWith("/api/hash-index-search"),

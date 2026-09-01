@@ -76,7 +76,12 @@ try {
         <button id="stopBtn" type="button" disabled class="danger">终止</button>
         <button id="retryBtn" type="button" disabled class="ghost">重试失败</button>
         <button id="clearFailBtn" type="button" class="ghost" title="一键移除当前下载失败的列表（一次性，不影响之后新出现的失败）">清除失败</button>
+        <!-- 2026-09-02 用户要求（#16-B）：下载任务 json 导入/导出（存档备份 / 换端迁移） -->
+        <button id="taskExportBtn" type="button" class="ghost" title="导出当前下载任务为 json（含已排队的链接）">导出任务 json</button>
+        <button id="taskImportBtn" type="button" class="ghost" title="从任务 json 导入链接加入下载队列">导入任务 json</button>
+        <input type="file" id="taskImportFile" accept=".json,application/json" style="display:none">
       </div>
+      <div class="status" id="taskJsonStatus"></div>
       <div class="progress-wrap mt">
         <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
       </div>
@@ -173,6 +178,19 @@ try {
       </div>
     </div>
 
+    <!-- 2026-09-02 用户要求（#17）：默认下载位置 +（#16-A）未完成任务扫描 -->
+    <div class="card">
+      <h2>默认下载位置</h2>
+      <p class="hint">未在下方配置下载路径的游戏，下载时自动落到<b>该根目录/游戏名</b>文件夹（下载时自动创建游戏名目录）。留空则不启用默认位置（未配置的游戏下载会报错提示）。</p>
+      <div class="row">
+        <input type="text" id="defaultDownloadPath" placeholder="/volume6/…/默认下载根目录" style="flex:1;min-width:200px">
+      </div>
+      <div class="row mt">
+        <button class="primary" id="saveDefaultPathBtn" type="button">保存默认下载位置</button>
+        <span class="status" id="defaultPathStatus"></span>
+      </div>
+    </div>
+
     <!-- 2026-08-26 用户要求：文件夹合并放进设置里面（2026-08-31 用户要求：调整为卡片第一个小功能标题） -->
     <div class="card">
 
@@ -245,8 +263,27 @@ try {
       <div class="row">
         <input type="text" id="hashInput" placeholder="hash 或图片短名" style="width:340px">
         <button id="hashQueryBtn" type="button">查询</button>
-        <button id="hashRebuildBtn" type="button" class="ghost" title="下载了新 mod 后重建索引（启动时也会自动建）">重建索引</button>
+        <!-- 2026-09-02 用户要求：重建索引支持选游戏（索引按游戏分文件存 json/index/<游戏名>.json） -->
+        <select id="hashRebuildGame" title="选择要重建索引的游戏（默认全部）" style="max-width:230px">
+          <option value="">全部游戏</option>
+        </select>
+        <button id="hashRebuildBtn" type="button" class="ghost" title="下载了新 mod 后重建索引（启动时也会自动建）；选某游戏则只重建该游戏索引">重建索引</button>
       </div>
+      <!-- 2026-09-02 用户要求（#16）：未完成任务扫描并入重建索引——重建时顺带扫描，
+           找出含 .part 残留 / html 记录文件本地缺失的未下载完 mod，整理成任务 json -->
+      <div class="row" style="margin-top:6px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="hashRebuildScan" checked>
+          <span>重建时顺带扫描未完成任务（.part 残留 / 文件缺失 → 任务 json）</span>
+        </label>
+        <span class="status" id="scanIncompleteStatus"></span>
+      </div>
+      <!-- 2026-09-02 用户要求：导出按钮固定放这儿，扫描出 json 数据后才可点击（无数据禁用） -->
+      <div class="row" style="margin-top:6px">
+        <button id="scanIncompleteDlBtn" type="button" class="ghost" disabled title="扫描出未完成任务后可一键加入下载队列">一键加入下载队列</button>
+        <button id="scanIncompleteExportBtn" type="button" class="ghost" disabled title="扫描出任务 json 后可导出保存/换端迁移">导出任务 json</button>
+      </div>
+      <div id="scanIncompleteResult" style="margin-top:8px"></div>
       <div class="status" id="hashStatus"></div>
       <div id="hashResult"></div>
       <hr style="border:none;border-top:1px dashed var(--border);margin:12px 0">
@@ -281,12 +318,14 @@ try {
   </div>
 </div>
 
-<!-- 2026-09-01 保存设置悬浮按钮（右下角，仅设置页显示） -->
+<!-- 2026-09-01 用户要求：保存设置改悬浮按钮（右下角，仅设置页显示） -->
 <button id="saveSettingsFab" type="button" title="保存设置">💾</button>
 
 <!-- 纯前端模板：mock-api.js 提供全局 api()（空态+契约注释）；接真实后端时替换/删除即可 -->
 <script src="mock-api.js"></script>
-<script src="app.js?v=template"></script>
+<!-- 2026-09-02 路径输入+目录选择小模块（模板内同名文件，复用 app.js 的 PathPicker.attach） -->
+<script src="path-picker.js"></script>
+<script src="app.js?v=20260902-picker"></script>
 
 <!-- 目录选择弹窗（设置页「读取本地选择」下载路径） -->
 <div class="modal-mask" id="browseMask" style="display:none">

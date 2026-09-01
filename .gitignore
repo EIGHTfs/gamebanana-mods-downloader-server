@@ -47,6 +47,9 @@ bun.lock
 npm-debug.log*
 .npm/
 .pnpm-store/
+# 注：2026-09-02 已移除 dsh-git-push 旧版误加的 14 条「敏感字段文件」忽略项——
+# 这些是项目源码/模板/油猴脚本（仅含字段名/API 参数/界面文案，无真实凭据值），
+# 已由 dsh-git-push v1.13+ 根因修复（只认字符串字面量）不再误报，恢复入库跟踪。
 # 敏感字段文件（dsh-git-push 自动追加，2026-09-01）
 docs/gamebanana-cookie-userscript.user.js
 docs/gbmd-开发者文档-20260827.md

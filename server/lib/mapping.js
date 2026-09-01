@@ -16,19 +16,27 @@
 "use strict";
 
 const path = require("path");
+const fs = require("fs");
 const cfg = require("../config");
 
 // ---------- 非法字符映射（最高优先级，2026-09-02）----------
-// mapping/<游戏名>.json 顶层可选字段 illegalChars：{ 非法字符: 合规字符 }，
+// 独立全局映射文件 mapping/illegalChars.json：{ 非法字符: 合规字符 }，
 // 生成目录名/文件名时最先应用（先于 roles/variants/warehouses 映射）。
-// 例：{ ":": "：" } → 半角冒号(Windows 非法，触发 8.3 短名) 换成全角冒号。
-function illegalCharsOf(game) {
+// 例：{ ": ": "：" } → 半角冒号(Windows 非法，触发 8.3 短名) 换成全角冒号。
+// 文件缺失/损坏时返回空映射（不替换任何字符）——行为完全由映射文件决定，代码不写死。
+const ILLEGAL_CHARS_FILE = path.join(cfg.MAPPING_DIR, "illegalChars.json");
+let _illegalCache = { mtime: 0, map: {} }; // 小缓存：mtime 变化才重读
+function illegalCharsOf() {
   try {
-    const m = cfg.readGameMapping(game);
-    return (m && m.illegalChars) || {};
-  } catch (_) {
-    return {};
-  }
+    const st = fs.statSync(ILLEGAL_CHARS_FILE);
+    if (st.mtimeMs === _illegalCache.mtime) return _illegalCache.map;
+    const m = JSON.parse(fs.readFileSync(ILLEGAL_CHARS_FILE, "utf8"));
+    if (m && typeof m === "object") {
+      _illegalCache = { mtime: st.mtimeMs, map: m };
+      return m;
+    }
+  } catch (_) {}
+  return _illegalCache.map; // 读取失败时用上次缓存；从未成功过则空映射
 }
 
 // 应用非法字符映射：对 str 中每个 key 做全局替换（split/join 避开正则特殊字符）
@@ -42,11 +50,11 @@ function applyIllegalChars(str, map) {
 }
 
 // ---------- 名称合规化 ----------
-// 下载不改原始文件名，除非文件名含 Windows/Linux 文件系统非法字符 → 非法字符用空格替换
-// 非法字符：< > : " / \ | ? * 和控制字符（/ \ 是路径分隔符也必须处理）
+// 非法字符全部来自 mapping/illegalChars.json（不再写死正则）；
+// 控制字符（\u0000-\u001f）代码兜底仍替换为空格
 function sanitizeName(name) {
-  return String(name == null ? "" : name)
-    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, " ") // 非法字符 → 空格
+  return applyIllegalChars(String(name == null ? "" : name), illegalCharsOf())
+    .replace(/[\u0000-\u001f]/g, " ") // 控制字符 → 空格（代码兜底，不入映射文件）
     .replace(/\s+/g, " ")                        // 多个空格合并为一个
     .replace(/[. ]+$/g, "")                      // 去尾部点和空格（Windows）
     .trim();
@@ -139,7 +147,7 @@ function itemDirName(category, game) {
   if (!gameMap) return en;
   const roles = (gameMap.roles) || {};
   const variants = (gameMap.variants) || {};
-  const illegal = gameMap.illegalChars || {}; // 非法字符映射（最高优先级，最后清洗输出）
+  const illegal = illegalCharsOf(); // 非法字符映射（全局 mapping/illegalChars.json，最高优先级，最后清洗输出）
   const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");
   const enN = norm(en);
   let zh = roles[en] || "";

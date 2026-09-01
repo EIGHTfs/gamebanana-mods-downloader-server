@@ -21,6 +21,7 @@ const search = require("./lib/search");
 const mergeDirs = require("./lib/merge-dirs");
 const dataBackup = require("./lib/data-backup");
 const hashIndex = require("./lib/hash-index");
+const incompleteScan = require("./lib/incomplete-scan");
 
 const PUBLIC_DIR = path.join(__dirname, "public");
 const MIME = {
@@ -181,7 +182,7 @@ const server = http.createServer(async (req, res) => {
           if (parsed.cookie) body.gbCookie = parsed.cookie; // 非空才写，避免空值覆盖
         }
       }
-      const allowed = ["gbCookie", "downloadConcurrency", "sessionHours", "port"];
+      const allowed = ["gbCookie", "downloadConcurrency", "sessionHours", "port", "defaultDownloadPath"];
       for (const k of allowed) {
         if (body[k] === undefined) continue;
         // 敏感字段（gbCookie）为空串时跳过不覆盖：留空 = 不改
@@ -236,6 +237,32 @@ const server = http.createServer(async (req, res) => {
     if (method === "POST" && pathname === "/api/hash-rebuild") {
       hashIndex.rebuild().then(() => {}).catch(() => {});
       return sendJson(res, 200, { ok: true, running: true });
+    }
+    // ---- 未完成任务扫描（#16-A，2026-09-02 用户要求）----
+    // POST /api/scan-incomplete → 扫描全部游戏根目录 description.html，
+    //   找出「含 .part 残留 / html 记录文件本地缺失」的未下载完 mod → 任务 json。
+    if (method === "POST" && pathname === "/api/scan-incomplete") {
+      try {
+        const results = await incompleteScan.scanIncomplete();
+        const taskJson = incompleteScan.toTaskJson(results);
+        const links = incompleteScan.extractLinks(taskJson);
+        return sendJson(res, 200, { ok: true, count: results.length, links, taskJson });
+      } catch (e) {
+        return sendJson(res, 500, { ok: false, error: e.message || String(e) });
+      }
+    }
+    // POST /api/scan-incomplete/download → 把扫描出的未完成任务一键加入下载队列
+    if (method === "POST" && pathname === "/api/scan-incomplete/download") {
+      try {
+        const body = await readBody(req);
+        const links = Array.isArray(body.links) ? body.links : [];
+        const valid = links.map((s) => String(s).trim()).filter((s) => s && (s.includes("gamebanana.com") || /^\d+$/.test(s)));
+        if (!valid.length) return sendJson(res, 400, { ok: false, error: "没有有效的链接" });
+        const t = await downloader.startDownloadTask({ mods: valid.map((l) => ({ profileUrl: l })) });
+        return sendJson(res, 200, { ok: true, started: true, count: valid.length, task: t });
+      } catch (e) {
+        return sendJson(res, 500, { ok: false, error: e.message || String(e) });
+      }
     }
     // GET /api/hash-index-search?q=<关键词>&game=<游戏名可选> → GB 表模糊搜索（离线 mod 目录）
     if (method === "GET" && pathname === "/api/hash-index-search") {
@@ -592,6 +619,44 @@ const server = http.createServer(async (req, res) => {
     }
     if (method === "GET" && pathname === "/api/task/restore-mode") {
       return sendJson(res, 200, { ok: true, restoreOnly: downloader.getRestoreMode() });
+    }
+    // ---- 下载任务 json 导入/导出（#16-B，2026-09-02 用户要求）----
+    // GET /api/task/export → 导出当前下载任务为任务 json（可导入其他端/存档备份）
+    if (method === "GET" && pathname === "/api/task/export") {
+      try {
+        const t = downloader.getTask() || {};
+        const seen = new Set();
+        const tasks = [];
+        const push = (u, name) => {
+          const modId = (() => { try { return String(gbApi.extractModId(u) || "").trim(); } catch (_) { return ""; } })();
+          if (!modId || seen.has(modId)) return;
+          seen.add(modId);
+          tasks.push({ url: u || "", modId, name: name || "" });
+        };
+        for (const it of t.items || []) push(it.modUrl || it.url || "", it.modName || it.displayName || "");
+        for (const p of t.pendingMods || []) push(p.profileUrl || p.url || "", p.name || "");
+        const taskJson = { schema: "gbmd-tasks-v1", exportedAt: new Date().toISOString(), count: tasks.length, tasks };
+        return sendJson(res, 200, { ok: true, taskJson });
+      } catch (e) {
+        return sendJson(res, 500, { ok: false, error: e.message || String(e) });
+      }
+    }
+    // POST /api/task/import → body.json 为任务 json 文本 → 提取链接加入下载队列
+    if (method === "POST" && pathname === "/api/task/import") {
+      try {
+        const body = await readBody(req);
+        let taskJson = null;
+        if (typeof body.json === "string") taskJson = JSON.parse(body.json);
+        else if (body.taskJson) taskJson = body.taskJson;
+        else taskJson = body;
+        const links = incompleteScan.extractLinks(taskJson || {});
+        const valid = links.map((s) => String(s).trim()).filter((s) => s && (s.includes("gamebanana.com") || /^\d+$/.test(s)));
+        if (!valid.length) return sendJson(res, 400, { ok: false, error: "导入的任务 json 里没有有效链接" });
+        const t = await downloader.startDownloadTask({ mods: valid.map((l) => ({ profileUrl: l })) });
+        return sendJson(res, 200, { ok: true, imported: valid.length, started: true, task: t });
+      } catch (e) {
+        return sendJson(res, 400, { ok: false, error: "任务 json 解析失败: " + (e.message || String(e)) });
+      }
     }
 
     // ---- 本地目录浏览（设置页「读取本地选择」下载路径；用户原话 2026-08-26）----

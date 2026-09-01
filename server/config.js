@@ -33,7 +33,10 @@ const DEFAULT_CONFIG = {
   // GB 登录检测用 NSFW mod（hide 可见性，未登录拉不到文件列表）
   gbCheckModId: 708465,
   // 2026-08-30 用户要求：自动整理（organizeDir 移出外部文件）默认禁用
-  autoOrganize: false
+  autoOrganize: false,
+  // 2026-09-02 用户要求（#17）：默认下载位置——未在 gamebanana.com.json 配置 downloadPath
+  //   的游戏，下载时自动落到「该根目录/<游戏名>」作为下载路径（gameRootOf fallback）。
+  defaultDownloadPath: ""
 };
 
 function readConfig() {
@@ -124,9 +127,15 @@ function findGameEntry(gameNameOrId) {
 }
 
 // 取游戏下载根目录（gamebanana.com.json downloadPath）
+// 2026-09-02 用户要求（#17）：未配置 downloadPath 的游戏 → fallback 到「默认下载位置/游戏名」，
+//   下载时 buildTargetDir 自动落到该根目录（下载时创建游戏名文件夹）。
 function gameRootOf(gameName) {
   const e = findGameEntry(gameName);
-  return e ? String(e.downloadPath || "").trim() : "";
+  if (e && String(e.downloadPath || "").trim()) return String(e.downloadPath).trim();
+  const def = String(readConfig().defaultDownloadPath || "").trim();
+  if (!def) return "";
+  const name = (e && e.name) || String(gameName || "").trim();
+  return name ? path.join(def, name) : def;
 }
 
 // 游戏 id（香蕉网权威 id）

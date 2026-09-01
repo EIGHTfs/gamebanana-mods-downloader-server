@@ -213,9 +213,24 @@ async function rebuild() {
     const games = cfg.readGame() || {};
     const seen = new Set();
     const roots = [];
-    for (const g of Object.values(games)) {
-      const r = String((g && g.downloadPath) || "").trim();
+    // 2026-09-02（#17）：改用 gameRootOf——未配置 downloadPath 的游戏经默认下载位置 fallback，
+    //   默认位置下自动创建的游戏名文件夹同样纳入索引重建
+    for (const name of Object.keys(games)) {
+      const r = cfg.gameRootOf(name);
       if (r && !seen.has(r)) { seen.add(r); roots.push(r); }
+    }
+    // 默认下载位置本身（自动创建的游戏名子目录未进游戏列表时仍可扫到）
+    const def = String(cfg.readConfig().defaultDownloadPath || "").trim();
+    if (def && fs.existsSync(def)) {
+      let hasSub = false;
+      try {
+        for (const ent of fs.readdirSync(def, { withFileTypes: true })) {
+          if (!ent.isDirectory()) continue;
+          const sub = path.join(def, ent.name);
+          if (!seen.has(sub)) { seen.add(sub); roots.push(sub); hasSub = true; }
+        }
+      } catch (_) {}
+      if (!hasSub && !seen.has(def)) { seen.add(def); roots.push(def); }
     }
     let count = 0;
     const walk = async (dir, root) => {

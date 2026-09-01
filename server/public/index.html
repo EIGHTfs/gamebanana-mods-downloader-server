@@ -76,7 +76,12 @@ try {
         <button id="stopBtn" type="button" disabled class="danger">终止</button>
         <button id="retryBtn" type="button" disabled class="ghost">重试失败</button>
         <button id="clearFailBtn" type="button" class="ghost" title="一键移除当前下载失败的列表（一次性，不影响之后新出现的失败）">清除失败</button>
+        <!-- 2026-09-02 用户要求（#16-B）：下载任务 json 导入/导出（存档备份 / 换端迁移） -->
+        <button id="taskExportBtn" type="button" class="ghost" title="导出当前下载任务为 json（含已排队的链接）">导出任务 json</button>
+        <button id="taskImportBtn" type="button" class="ghost" title="从任务 json 导入链接加入下载队列">导入任务 json</button>
+        <input type="file" id="taskImportFile" accept=".json,application/json" style="display:none">
       </div>
+      <div class="status" id="taskJsonStatus"></div>
       <div class="progress-wrap mt">
         <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
       </div>
@@ -171,6 +176,30 @@ try {
         <span id="addGameName" style="font-weight:600"></span>
         <button class="success" id="addGameConfirmBtn" type="button">添加到游戏列表</button>
       </div>
+    </div>
+
+    <!-- 2026-09-02 用户要求（#17）：默认下载位置 +（#16-A）未完成任务扫描 -->
+    <div class="card">
+      <h2>默认下载位置</h2>
+      <p class="hint">未在下方配置下载路径的游戏，下载时自动落到<b>该根目录/游戏名</b>文件夹（下载时自动创建游戏名目录）。留空则不启用默认位置（未配置的游戏下载会报错提示）。</p>
+      <div class="row">
+        <input type="text" id="defaultDownloadPath" placeholder="/volume6/…/默认下载根目录" style="width:100%">
+      </div>
+      <div class="row mt">
+        <button class="primary" id="saveDefaultPathBtn" type="button">保存默认下载位置</button>
+        <span class="status" id="defaultPathStatus"></span>
+      </div>
+
+      <hr style="border:none;border-top:1px dashed var(--border);margin:14px 0">
+      <h3 style="margin:4px 0 8px;font-size:14px;color:var(--primary)">🔍 未完成任务扫描（#16）</h3>
+      <p class="hint" style="margin:4px 0 8px">扫描全部游戏根目录 description.html，找出<b>含 .part 残留 / html 记录文件本地缺失</b>的未下载完 mod，整理成任务 json——可一键加入下载队列，或导出 json 存档/换端迁移（配合下载进度页「导入任务 json」）。</p>
+      <div class="row">
+        <button id="scanIncompleteBtn" type="button">扫描未完成任务</button>
+        <button id="scanIncompleteDlBtn" type="button" class="ghost" style="display:none">一键加入下载队列</button>
+        <button id="scanIncompleteExportBtn" type="button" class="ghost" style="display:none">导出任务 json</button>
+        <span class="status" id="scanIncompleteStatus"></span>
+      </div>
+      <div id="scanIncompleteResult" style="margin-top:8px"></div>
     </div>
 
     <!-- 2026-08-26 用户要求：文件夹合并放进设置里面（2026-08-31 用户要求：调整为卡片第一个小功能标题） -->

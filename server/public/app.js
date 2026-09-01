@@ -39,6 +39,17 @@ function setStatus(el, msg, type) {
   el.className = type && type !== "status" ? "status " + type : "status";
 }
 
+// 2026-09-02 任务 json 导出：浏览器端生成 Blob 下载文件
+function downloadJsonFile(obj, filename) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename || "download.json";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 300);
+}
+
 // 2026-09-01 悬浮提示（右下角 toast，自动淡出；保存设置等操作反馈用）
 let _toastTimer = null;
 function showToast(msg, type) {
@@ -761,6 +772,10 @@ function renderTask(task) {
         else if (r.ok) { cls = "ok"; icon = "✓"; statusText = "成功"; }
         else { cls = "fail"; icon = "✗"; statusText = r.error || "失败"; }
       }
+      // 2026-09-02 用户要求：忽略/跳过原因（如「游戏未配置下载路径」）显示在 UI 上
+      if (item.skipReason) statusText += `（${item.skipReason}）`;
+      // 2026-09-02 错误项（构建失败，无 path）原因也显示
+      else if (item.buildError) statusText += `（${item.buildError}）`;
       // 2026-08-26 用户要求加回：失败行 🔄重试 / 🚫跳过 按钮；
       //   2026-08-26 修复：卡住行（无结果且任务非运行中）也显示按钮（重试/跳过后才能处理它）
       //   2026-09-02 新增：type=error 且 path="" 的错误项（构建失败，只有 mod url）
@@ -977,6 +992,115 @@ function bindSettings() {
       showToast("❌ 保存失败：" + e.message, "err");
     }
   });
+
+  // 2026-09-02 用户要求（#17）：默认下载位置保存（写入 config.json defaultDownloadPath）
+  const saveDefPathBtn = $("#saveDefaultPathBtn");
+  if (saveDefPathBtn) saveDefPathBtn.addEventListener("click", async () => {
+    const st = $("#defaultPathStatus");
+    const v = ($("#defaultDownloadPath").value || "").trim();
+    try {
+      const r = await api("/api/settings", "POST", { defaultDownloadPath: v });
+      if (!r.ok) throw new Error(r.error || "保存失败");
+      settings = r.settings;
+      setStatus(st, "已保存默认下载位置" + (v ? `：${v}` : "（已清空，未配置游戏下载将报错提示）"), "ok");
+    } catch (e) {
+      setStatus(st, "保存失败: " + e.message, "err");
+    }
+  });
+
+  // 2026-09-02 用户要求（#16-A）：未完成任务扫描（.part 残留 / html 记录文件缺失）
+  let lastScanTaskJson = null;
+  const scanBtn = $("#scanIncompleteBtn");
+  if (scanBtn) scanBtn.addEventListener("click", async () => {
+    const st = $("#scanIncompleteStatus");
+    const out = $("#scanIncompleteResult");
+    const dlBtn = $("#scanIncompleteDlBtn");
+    const exBtn = $("#scanIncompleteExportBtn");
+    setStatus(st, "扫描全部游戏根目录…", "");
+    out.innerHTML = "";
+    dlBtn.style.display = "none";
+    exBtn.style.display = "none";
+    try {
+      const r = await api("/api/scan-incomplete", "POST", {});
+      if (!r.ok) throw new Error(r.error || "扫描失败");
+      lastScanTaskJson = r.taskJson;
+      const list = (r.taskJson && r.taskJson.tasks) || [];
+      setStatus(st, `✅ 发现 ${r.count} 个未完成任务（${r.links.length} 个可下载链接）`, "ok");
+      out.innerHTML = list.length
+        ? '<div style="max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:6px;padding:6px">' +
+          list.map((t) => {
+            const miss = (t.missingFiles || []).slice(0, 3).map((m) => esc(m)).join("、");
+            const parts = (t.partFiles || []).length ? `，part: ${esc((t.partFiles || [])[0])}` : "";
+            return `<div style="padding:3px 4px;border-bottom:1px dashed var(--border)">📦 <b>${esc(t.name || t.modId || t.url)}</b>` +
+              (t.game ? ` <span class="hint">(${esc(t.game)})</span>` : "") +
+              `<br><span class="hint" style="font-size:12px">${esc(t.modDir || "")}</span>` +
+              (miss ? `<br><span class="hint" style="font-size:12px;color:var(--warn,#c77)">缺: ${miss}</span>` : "") + parts +
+              `</div>`;
+          }).join("") + '</div>'
+        : '<div class="hint">无未完成任务（全部 mod 下载完整）</div>';
+      if (r.links.length) dlBtn.style.display = "";
+      if (list.length) exBtn.style.display = "";
+    } catch (e) {
+      setStatus(st, "扫描失败: " + e.message, "err");
+    }
+  });
+
+  const scanDlBtn = $("#scanIncompleteDlBtn");
+  if (scanDlBtn) scanDlBtn.addEventListener("click", async () => {
+    const st = $("#scanIncompleteStatus");
+    if (!lastScanTaskJson || !lastScanTaskJson.tasks || !lastScanTaskJson.tasks.length) return;
+    const links = lastScanTaskJson.tasks.map((t) => t.url || t.modId).filter(Boolean);
+    try {
+      const r = await api("/api/scan-incomplete/download", "POST", { links });
+      if (!r.ok) throw new Error(r.error || "加入失败");
+      setStatus(st, `✅ 已将 ${r.count || links.length} 个未完成任务加入下载队列`, "ok");
+      try { const t = await api("/api/task"); if (t && t.task) renderTask(t.task); } catch (_) {}
+    } catch (e) {
+      setStatus(st, "加入下载失败: " + e.message, "err");
+    }
+  });
+
+  const scanExBtn = $("#scanIncompleteExportBtn");
+  if (scanExBtn) scanExBtn.addEventListener("click", () => {
+    if (!lastScanTaskJson) return;
+    downloadJsonFile(lastScanTaskJson, `未完成任务-${new Date().toISOString().slice(0, 10)}.json`);
+  });
+
+  // 2026-09-02 用户要求（#16-B）：下载任务 json 导出 / 导入
+  const taskExportBtn = $("#taskExportBtn");
+  if (taskExportBtn) taskExportBtn.addEventListener("click", async () => {
+    const st = $("#taskJsonStatus");
+    try {
+      const r = await api("/api/task/export");
+      if (!r.ok) throw new Error(r.error || "导出失败");
+      downloadJsonFile(r.taskJson, `下载任务-${new Date().toISOString().slice(0, 10)}.json`);
+      setStatus(st, `✅ 已导出 ${r.taskJson.count} 个任务链接`, "ok");
+    } catch (e) {
+      setStatus(st, "导出失败: " + e.message, "err");
+    }
+  });
+
+  const taskImportBtn = $("#taskImportBtn");
+  const taskImportFile = $("#taskImportFile");
+  if (taskImportBtn && taskImportFile) {
+    taskImportBtn.addEventListener("click", () => taskImportFile.click());
+    taskImportFile.addEventListener("change", async () => {
+      const st = $("#taskJsonStatus");
+      const f = taskImportFile.files && taskImportFile.files[0];
+      if (!f) return;
+      try {
+        const text = await f.text();
+        const r = await api("/api/task/import", "POST", { json: text });
+        if (!r.ok) throw new Error(r.error || "导入失败");
+        setStatus(st, `✅ 已导入 ${r.imported} 个链接加入下载队列`, "ok");
+        try { const t = await api("/api/task"); if (t && t.task) renderTask(t.task); } catch (_) {}
+      } catch (e) {
+        setStatus(st, "导入失败: " + e.message, "err");
+      } finally {
+        taskImportFile.value = "";
+      }
+    });
+  }
 
   const gbLoginBtn = $("#gbLoginCheckBtn");
   if (gbLoginBtn) gbLoginBtn.addEventListener("click", checkGbLoginStatus);
@@ -1283,6 +1407,9 @@ async function loadSettings() {
   try {
     const r = await api("/api/settings");
     settings = r.settings;
+    // 2026-09-02 回填默认下载位置（#17）
+    const defPathEl = $("#defaultDownloadPath");
+    if (defPathEl && settings.defaultDownloadPath) defPathEl.value = settings.defaultDownloadPath || "";
     // 2026-08-26 用户要求：设置里不要并发数（只在「下载进度」页改）——不再回填 dlConcurrency
     // 2026-09-01 后端脱敏：不回传 gbCookie 明文，改用 hasGbCookie 提示 + dataset.filled 只填一次
     const cookieEl = $("#gbCookie");

@@ -704,7 +704,12 @@ const server = http.createServer(async (req, res) => {
       const mime = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp" }[ext];
       if (!mime) { res.writeHead(403); res.end("not an image"); return; }
       const abs = path.resolve(filePath);
+      // 2026-09-02：预览白名单必须含 defaultDownloadPath。未给游戏单独配
+      // downloadPath 时文件落在「默认下载位置/游戏名/…」，只认 gamebanana.com.json
+      // 会导致进度页缩略图 403（磁盘上图在、UI 显示不存在）。
       const roots = Object.values(cfg.readGame()).map((e) => e && e.downloadPath).filter((r) => r && String(r).trim());
+      const def = String(cfg.readConfig().defaultDownloadPath || "").trim();
+      if (def) roots.push(def);
       const inRoot = roots.some((r) => {
         const rr = path.resolve(r);
         return abs === rr || abs.startsWith(rr + path.sep);

@@ -16,6 +16,9 @@ node_modules/
 
 # 真实游戏配置（含本地下载路径，敏感）——不上传；仓库只保留 gamebanana.com.json.example 示例
 json/gamebanana.com.json
+
+# 本机测试下载目录（不入库）
+_test-download/
 # 构建产物（release 由用户自行分发）
 dist/
 

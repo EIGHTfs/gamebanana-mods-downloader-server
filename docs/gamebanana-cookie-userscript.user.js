@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         GameBanana 下载助手（Cookie + 一键发送到服务器）
 // @namespace    gbmd-cred
-// @version      4.0.0
-// @description  右下角 🍌 面板：显示 GameBanana 登录态/用户名/剩余天数、复制完整 Cookie（含 HttpOnly，sess+rmc）；「📤 发送到服务器」把当前 mod 页链接一键推给 GameBanana Mod Downloader 下载（设了密码会自动用保存的密码登录）
+// @version      4.1.0
+// @description  右下角 🍌 面板：显示 GameBanana 登录态/用户名/剩余天数、复制完整 Cookie（含 HttpOnly，sess+rmc）；「📤 发送到服务器」把当前 mod 页链接一键推给 GameBanana Mod Downloader 下载（设了密码会自动用保存的密码登录）；「🔄 注入登录态到浏览器」把服务器保存的 Cookie 写回当前浏览器
 // @author       fnOS
 // @match        https://gamebanana.com/*
 // @match        https://www.gamebanana.com/*
@@ -10,6 +10,7 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_cookie.list
+// @grant        GM_cookie.set
 // @grant        GM_xmlhttpRequest
 // @connect      *
 // @run-at       document-idle
@@ -17,6 +18,10 @@
 // ==/UserScript==
 
 /* ============================================================
+ * v4.1.0（2026-09-02，参照 iwara 下载助手 v7.5「注入登录态到浏览器」改法）
+ * - 新增「🔄 注入登录态到浏览器」：GET /api/cred 从服务器拉明文 gbCookie，
+ *   逐项写 document.cookie（HttpOnly 项 GM_cookie.set 兜底），刷新页面生效。
+ *   GameBanana 会话绑定创建 UA：返回 gbUserAgent，当前浏览器族不一致时提示可能无效。
  * v4.0.0（2026-09-01，参照 iwara 下载助手 v7 分工改法）
  * - 点右下角 🍌 立即弹面板；打开面板/发送【不读本机 Cookie】
  * - 用 GET /api/gb-login-status 当「服务器在线 + 账号信息」（已登录用户名/剩余天数/是否配置凭证）
@@ -28,7 +33,7 @@
 (function () {
     "use strict";
 
-    const VER = "4.0.0";
+    const VER = "4.1.0";
     const SRV_KEY = "gbcred_server";      // gbmd 服务器地址
     const SRV_PWD_KEY = "gbcred_server_pwd"; // 服务器访问密码
     function log(...a) { try { console.log("[gb-cred " + VER + "]", ...a); } catch (_) {} }
@@ -255,6 +260,7 @@
   </div>
   <div id="gbcred-srv-actions">
     <button id="gbcred-save">💾 记住地址</button>
+    <button id="gbcred-inject">🔄 注入登录态到浏览器</button>
   </div>
   <div id="gbcred-srv-status"></div>
   <div id="gbcred-local">
@@ -279,6 +285,7 @@
                     try { GM_setValue(SRV_PWD_KEY, panelEl.querySelector("#gbcred-server-pwd").value); } catch (_) {}
                     srvSetStatus("已记住服务器地址" + (panelEl.querySelector("#gbcred-server-pwd").value ? "（含密码）" : ""), "ok");
                 });
+                panelEl.querySelector("#gbcred-inject").addEventListener("click", srvInjectFlow);
             }
             if (panelEl.parentNode !== document.documentElement) document.documentElement.appendChild(panelEl);
         }
@@ -413,6 +420,89 @@
             }
         } finally {
             sendBtn.disabled = false;
+        }
+    }
+
+    /* ---------- 注入登录态到浏览器（v4.1.0，参照 iwara v7.5）---------- */
+
+    /** 从服务器拉明文凭证（GET /api/cred，需登录会话）。 */
+    async function fetchServerCreds(base, session) {
+        const headers = session ? { "Cookie": "session=" + session } : {};
+        const r = await gmRequest("GET", base + "/api/cred", undefined, 12000, headers);
+        if (r.ok && r.json && r.json.ok) return { ok: true, cred: r.json };
+        return { ok: false, error: (r.json && r.json.error) || r.error || ("HTTP " + r.status) };
+    }
+
+    /** 简单判断浏览器族（GameBanana 会话绑定创建 UA，仅提示用）。 */
+    function uaFamily(ua) {
+        ua = String(ua || "");
+        if (ua.indexOf("Edg/") >= 0) return "Edge";
+        if (ua.indexOf("Firefox/") >= 0) return "Firefox";
+        if (ua.indexOf("Chrome/") >= 0) return "Chrome";
+        if (ua.indexOf("Safari/") >= 0) return "Safari";
+        return "";
+    }
+
+    /** 把 Cookie 项逐个写进当前域（document.cookie；HttpOnly 项 GM_cookie.set 兜底）。 */
+    function applyCookieToBrowser(cookieText) {
+        const items = String(cookieText || "").split(";").map((s) => s.trim()).filter((p) => p && !/^=/.test(p) && !/deleted/i.test(p));
+        let written = 0;
+        for (const item of items) {
+            const eq = item.indexOf("=");
+            if (eq <= 0) continue;
+            const name = item.slice(0, eq).trim();
+            const value = item.slice(eq + 1).trim();
+            if (!name || !value) continue;
+            try { document.cookie = name + "=" + value + "; path=/"; written++; } catch (_) {}
+            // HttpOnly（如 sess/rmc）document.cookie 写不进，用 GM_cookie.set 兜底
+            if (typeof GM_cookie !== "undefined" && GM_cookie && typeof GM_cookie.set === "function") {
+                try { GM_cookie.set({ url: location.origin + "/", name, value, path: "/" }, () => {}); } catch (_) {}
+            }
+        }
+        return written;
+    }
+
+    /** 注入主流程：连接服务器 → GET /api/cred → 写 cookie，提示刷新。 */
+    async function srvInjectFlow() {
+        if (!ensureUi()) return;
+        const srvEl = panelEl.querySelector("#gbcred-server");
+        const base = normalizeServerBase((srvEl && srvEl.value.trim()) || "");
+        if (!base) { srvSetStatus("❌ 请先填服务器地址", "err"); return; }
+        const btn = panelEl.querySelector("#gbcred-inject");
+        if (btn) btn.disabled = true;
+        try {
+            srvSetStatus("正在连接服务器…", "info");
+            const p = await probeServer(base);
+            if (!p.ok) { srvSetStatus("注入失败：无法连接服务器 " + p.error, "err"); return; }
+            let session = "";
+            if (p.status && p.status.needsAuth) {
+                const pwdEl = panelEl.querySelector("#gbcred-server-pwd");
+                const lg = await serverLogin(base, (pwdEl && pwdEl.value) || "");
+                if (!lg.ok) { srvSetStatus("注入失败：服务器设有密码 " + lg.error, "err"); return; }
+                session = lg.session;
+            }
+            srvSetStatus("正在读取服务器凭证…", "info");
+            const got = await fetchServerCreds(base, session);
+            if (!got.ok) { srvSetStatus("读取凭证失败：" + got.error, "err"); return; }
+            const cred = got.cred || {};
+            const n = applyCookieToBrowser(cred.cookie);
+            const hasSess = /(?:^|;\s*)sess=/i.test(String(cred.cookie || ""));
+            const L = [];
+            L.push(`已写入 ${n} 个 Cookie 项` + (hasSess ? "（含 sess）" : ""));
+            // GameBanana 会话绑定创建时浏览器 UA：浏览器族不一致时提示可能无效
+            const curFam = uaFamily(navigator.userAgent);
+            const srvFam = uaFamily(cred.userAgent);
+            if (srvFam && curFam && srvFam !== curFam) L.push(`⚠ 凭证 UA 是 ${srvFam}，当前 ${curFam}（跨浏览器可能无效）`);
+            if (n > 0) {
+                srvSetStatus("✅ " + L.join("；") + " —— 请刷新页面生效", "ok");
+                showToast("✅ 登录态已注入，请刷新页面");
+            } else {
+                srvSetStatus("服务器没有可注入的 Cookie（gbCookie 为空）", "err");
+            }
+        } catch (e) {
+            srvSetStatus("注入失败：" + (e && e.message || e), "err");
+        } finally {
+            if (btn) btn.disabled = false;
         }
     }
 

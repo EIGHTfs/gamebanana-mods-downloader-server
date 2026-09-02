@@ -415,6 +415,19 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // ---- 明文凭证回传（油猴「🔄 注入登录态到浏览器」用；明文直传，需登录会话）----
+    // 2026-09-02 参照 iwara-downloader-server 的 /api/cred：油猴把服务器保存的 gbCookie
+    // 写回当前浏览器，省去手动复制。附 gbUserAgent：GameBanana 会话绑定创建时的浏览器 UA，
+    // 油猴据此提示「当前浏览器与凭证 UA 不一致」（跨浏览器注入的 cookie 可能无效）。
+    if (method === "GET" && pathname === "/api/cred") {
+      const cfgNow = cfg.readConfig();
+      return sendJson(res, 200, {
+        ok: true,
+        cookie: String(cfgNow.gbCookie || ""),
+        userAgent: String(cfgNow.gbUserAgent || "")
+      });
+    }
+
     // ---- 关键词搜索（中文/变体 → 英文归一后搜 GB Results API）----
     if (method === "GET" && pathname === "/api/keyword-search") {
       let q = String(parsed.query.q || "").trim();

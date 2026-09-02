@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         GameBanana 下载助手（Cookie + 一键发送到服务器）
 // @namespace    gbmd-cred
-// @version      4.1.0
-// @description  右下角 🍌 面板：显示 GameBanana 登录态/用户名/剩余天数、复制完整 Cookie（含 HttpOnly，sess+rmc）；「📤 发送到服务器」把当前 mod 页链接一键推给 GameBanana Mod Downloader 下载（设了密码会自动用保存的密码登录）；「🔄 注入登录态到浏览器」把服务器保存的 Cookie 写回当前浏览器
+// @version      4.2.0
+// @description  右下角 🍌 面板：显示 GameBanana 登录态/用户名/剩余天数、复制完整 Cookie（含 HttpOnly，sess+rmc）；「📤 发送到服务器」把当前 mod 页链接一键推给 GameBanana Mod Downloader 下载（设了密码会自动用保存的密码登录）；「🔄 注入登录态到浏览器」把服务器保存的 Cookie 写回当前浏览器并实测验证登录态（GB 会话绑定 UA，浏览器不一致会明确报错）
 // @author       fnOS
 // @match        https://gamebanana.com/*
 // @match        https://www.gamebanana.com/*
@@ -18,6 +18,12 @@
 // ==/UserScript==
 
 /* ============================================================
+ * v4.2.0（2026-09-02，注入登录态修复：GB 会话绑定 UA + 实测验证）
+ * - 修：GameBanana 会话绑定「创建会话时的浏览器 UA」——注入前比对凭证 UA 与当前浏览器
+ *   UA（浏览器标识+主版本），不一致直接报错不假装成功（此前只提示"可能无效"）
+ * - 修：注入后实测验证——用当前 UA + 刚写入的 cookie 请求 UiConfig 看 _bIsLoggedIn，
+ *   成功才显示 ✅（此前写完 cookie 就提示成功，实际可能未登录）
+ * - 修：GM_cookie.set 双域写入（gamebanana.com + www.gamebanana.com），防域不匹配
  * v4.1.0（2026-09-02，参照 iwara 下载助手 v7.5「注入登录态到浏览器」改法）
  * - 新增「🔄 注入登录态到浏览器」：GET /api/cred 从服务器拉明文 gbCookie，
  *   逐项写 document.cookie（HttpOnly 项 GM_cookie.set 兜底），刷新页面生效。
@@ -33,7 +39,7 @@
 (function () {
     "use strict";
 
-    const VER = "4.1.0";
+    const VER = "4.2.0";
     const SRV_KEY = "gbcred_server";      // gbmd 服务器地址
     const SRV_PWD_KEY = "gbcred_server_pwd"; // 服务器访问密码
     function log(...a) { try { console.log("[gb-cred " + VER + "]", ...a); } catch (_) {} }
@@ -423,7 +429,7 @@
         }
     }
 
-    /* ---------- 注入登录态到浏览器（v4.1.0，参照 iwara v7.5）---------- */
+    /* ---------- 注入登录态到浏览器（v4.2.0，参照 iwara v7.5 + GB UA 绑定实测验证）---------- */
 
     /** 从服务器拉明文凭证（GET /api/cred，需登录会话）。 */
     async function fetchServerCreds(base, session) {
@@ -433,19 +439,28 @@
         return { ok: false, error: (r.json && r.json.error) || r.error || ("HTTP " + r.status) };
     }
 
-    /** 简单判断浏览器族（GameBanana 会话绑定创建 UA，仅提示用）。 */
-    function uaFamily(ua) {
-        ua = String(ua || "");
-        if (ua.indexOf("Edg/") >= 0) return "Edge";
-        if (ua.indexOf("Firefox/") >= 0) return "Firefox";
-        if (ua.indexOf("Chrome/") >= 0) return "Chrome";
-        if (ua.indexOf("Safari/") >= 0) return "Safari";
-        return "";
+    /**
+     * GameBanana 会话绑定「创建会话时的浏览器 UA」：必须同款 UA（浏览器标识 + 主版本）才识别。
+     * 返回 { match, curDesc, srvDesc }——只认「浏览器标识 + 主版本号」一致，版本小差也判不一致（稳妥）。
+     */
+    function uaMatchCheck(curUA, srvUA) {
+        const key = (ua) => {
+            ua = String(ua || "");
+            const m = ua.match(/(Edg|Firefox|Chrome|Safari)\/(\d+)/);
+            return m ? (m[1] + "/" + m[2]) : "";
+        };
+        const curK = key(curUA), srvK = key(srvUA);
+        return {
+            match: !!(curK && srvK && curK === srvK),
+            curDesc: curK || "未知浏览器",
+            srvDesc: srvK || "未配置"
+        };
     }
 
-    /** 把 Cookie 项逐个写进当前域（document.cookie；HttpOnly 项 GM_cookie.set 兜底）。 */
+    /** 把 Cookie 项写进浏览器：document.cookie（当前域）+ GM_cookie.set 兜底（当前域 + 双域）。 */
     function applyCookieToBrowser(cookieText) {
         const items = String(cookieText || "").split(";").map((s) => s.trim()).filter((p) => p && !/^=/.test(p) && !/deleted/i.test(p));
+        const gbHosts = ["gamebanana.com", "www.gamebanana.com"];
         let written = 0;
         for (const item of items) {
             const eq = item.indexOf("=");
@@ -454,15 +469,32 @@
             const value = item.slice(eq + 1).trim();
             if (!name || !value) continue;
             try { document.cookie = name + "=" + value + "; path=/"; written++; } catch (_) {}
-            // HttpOnly（如 sess/rmc）document.cookie 写不进，用 GM_cookie.set 兜底
+            // HttpOnly（sess/rmc）document.cookie 写不进，GM_cookie.set 兜底；gamebanana.com 与 www 双域都写
             if (typeof GM_cookie !== "undefined" && GM_cookie && typeof GM_cookie.set === "function") {
-                try { GM_cookie.set({ url: location.origin + "/", name, value, path: "/" }, () => {}); } catch (_) {}
+                for (const host of gbHosts) {
+                    try { GM_cookie.set({ url: "https://" + host + "/", name, value, path: "/" }, () => {}); } catch (_) {}
+                }
             }
         }
         return written;
     }
 
-    /** 注入主流程：连接服务器 → GET /api/cred → 写 cookie，提示刷新。 */
+    /**
+     * 注入后实测验证：用「当前浏览器真实 UA + 刚写入的 cookie」请求 GameBanana UiConfig，
+     * 模拟浏览器导航行为（不带自定义 UA 头 = 浏览器默认 UA），看 _bIsLoggedIn 到底是否 true。
+     * 不依赖服务器，结论可直接告诉用户。
+     */
+    async function verifyInjectedLogin(cookieText) {
+        if (!cookieText) return { ok: false, reason: "无 cookie 可验证" };
+        const r = await gmRequest("GET", "https://gamebanana.com/apiv13/Member/UiConfig?_sUrl=%2F", undefined, 10000, { "Cookie": cookieText });
+        if (!r.ok) return { ok: false, reason: (r.json && r.json.error) || r.error || ("HTTP " + r.status) };
+        if (r.json && r.json._bIsLoggedIn === true) {
+            return { ok: true, idRow: r.json._idMemberRow || 0 };
+        }
+        return { ok: false, reason: "GameBanana 未识别为登录（_bIsLoggedIn=false）" };
+    }
+
+    /** 注入主流程：连接服务器 → GET /api/cred → UA 校验 → 写 cookie → 实测验证。 */
     async function srvInjectFlow() {
         if (!ensureUi()) return;
         const srvEl = panelEl.querySelector("#gbcred-server");
@@ -485,19 +517,30 @@
             const got = await fetchServerCreds(base, session);
             if (!got.ok) { srvSetStatus("读取凭证失败：" + got.error, "err"); return; }
             const cred = got.cred || {};
-            const n = applyCookieToBrowser(cred.cookie);
-            const hasSess = /(?:^|;\s*)sess=/i.test(String(cred.cookie || ""));
-            const L = [];
-            L.push(`已写入 ${n} 个 Cookie 项` + (hasSess ? "（含 sess）" : ""));
-            // GameBanana 会话绑定创建时浏览器 UA：浏览器族不一致时提示可能无效
-            const curFam = uaFamily(navigator.userAgent);
-            const srvFam = uaFamily(cred.userAgent);
-            if (srvFam && curFam && srvFam !== curFam) L.push(`⚠ 凭证 UA 是 ${srvFam}，当前 ${curFam}（跨浏览器可能无效）`);
-            if (n > 0) {
-                srvSetStatus("✅ " + L.join("；") + " —— 请刷新页面生效", "ok");
-                showToast("✅ 登录态已注入，请刷新页面");
+            const cookieText = String(cred.cookie || "");
+            if (!cookieText.trim()) { srvSetStatus("服务器没有可注入的 Cookie（gbCookie 为空）", "err"); return; }
+
+            // ① UA 校验：GB 会话绑定创建时浏览器 UA，不一致 = 注入必然无效（浏览器导航带自己的真实 UA）
+            const ua = uaMatchCheck(navigator.userAgent, cred.userAgent);
+            if (!ua.match) {
+                srvSetStatus(`❌ 无法注入：凭证绑定浏览器 ${ua.srvDesc}，当前浏览器 ${ua.curDesc}。GameBanana 会话绑定 UA —— 请用凭证同款浏览器（${ua.srvDesc}）打开本页再注入，或用当前浏览器登录后把新 cookie 存到服务器`, "err");
+                showToast("❌ UA 不匹配，注入无效");
+                return;
+            }
+
+            // ② 写入 cookie
+            const n = applyCookieToBrowser(cookieText);
+            const hasSess = /(?:^|;\s*)sess=/i.test(cookieText);
+            srvSetStatus(`已写入 ${n} 个 Cookie 项` + (hasSess ? "（含 sess）" : "") + "，正在实测验证登录态…", "info");
+
+            // ③ 实测验证：当前 UA + cookie 请求 UiConfig
+            const v = await verifyInjectedLogin(cookieText);
+            if (v.ok) {
+                srvSetStatus(`✅ 注入生效：${ua.srvDesc} 已识别为登录（用户 id ${v.idRow}）—— 刷新页面后顶部应显示用户名`, "ok");
+                showToast("✅ 登录态已注入并验证成功");
             } else {
-                srvSetStatus("服务器没有可注入的 Cookie（gbCookie 为空）", "err");
+                srvSetStatus(`⚠️ Cookie 已写入但验证未通过：${v.reason}。可能会话已过期/UA 仍是 ${ua.curDesc} 不匹配——需凭证同款浏览器（${ua.srvDesc}），或重新登录抓新 cookie`, "err");
+                showToast("⚠️ 注入未验证通过，看面板详情");
             }
         } catch (e) {
             srvSetStatus("注入失败：" + (e && e.message || e), "err");

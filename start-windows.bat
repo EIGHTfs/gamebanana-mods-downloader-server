@@ -59,10 +59,18 @@ if not "%PORT_OVERRIDE%"=="" set PORT=%PORT_OVERRIDE%
 rem ---------- 停止 ----------
 if /i "%CMD%"=="stop" goto stop_server
 
-rem ---------- 重启（先停再启）----------
+rem ---------- 重启（未运行则直接启动）----------
 if /i "%CMD%"=="restart" (
-  echo [RESTART] 重启服务 ...
-  call :stop_server
+  if exist "%PID_FILE%" (
+    for /f "usebackq delims=" %%i in ("%PID_FILE%") do set PID=%%i
+    tasklist /FI "PID eq %PID%" 2>nul | find "%PID%" >nul
+    if not errorlevel 1 (
+      echo [RESTART] 重启服务 ...
+      call :stop_server
+      goto start_server
+    )
+  )
+  echo [RESTART] 服务未运行，直接启动 ...
   goto start_server
 )
 

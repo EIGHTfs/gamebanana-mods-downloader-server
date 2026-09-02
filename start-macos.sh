@@ -106,9 +106,14 @@ stop_server() {
 }
 
 restart_server() {
-  echo "▶ 重启服务 ..."
-  stop_server || true
-  start_server "$@"
+  if [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "▶ 重启服务 ..."
+    stop_server || true
+    start_server "$@"
+  else
+    echo "服务未运行，直接启动 ..."
+    start_server "$@"
+  fi
 }
 
 status_server() {

@@ -31,6 +31,8 @@ const UNZIP_BIN = () => findTool("unzip");
 function readManifest() {
   const m = JSON.parse(fs.readFileSync(MANIFEST_FILE, "utf8"));
   if (m.schema !== 1) throw new Error("不支持的清单版本 schema=" + m.schema);
+  // 【不要】校验 m.app：2026-09-03 清单 app 从简称改成全称，旧备份 zip 里仍是 gbmd。
+  // 导入白名单只看 schema + files[].rel + dirs[].rel/suffix；app/note 纯说明，改它们不影响前端 zip 导入导出。
   return m;
 }
 
@@ -108,6 +110,7 @@ function restoreFromDir(outDir, manifest) {
   }
   if (!m || m.schema !== 1) throw new Error("未找到 userdata-manifest.json（无法校验白名单）");
   if (!m.files || !m.dirs) throw new Error("清单格式无效");
+  // 不读 m.app：旧 zip（app=gbmd）与新 zip（app=全称）同一套 files/dirs 白名单即可恢复。
 
   // 白名单：精确文件 + dirs 目录下以 suffix 结尾
   const allowedExact = new Set(m.files.map((f) => f.rel));

@@ -1088,7 +1088,14 @@ function saveTask() {
   } catch (_) {}
 }
 
-function getTask() { return task; }
+function getTask() {
+  let totalSpeed = 0;
+  for (const a of (task && task.activeItems) || []) {
+    if (a && a.speed > 0) totalSpeed += a.speed;
+  }
+  if (task) task.totalSpeed = totalSpeed;
+  return task;
+}
 
 // ---------- 主循环 ----------
 async function runDownloadLoop() {

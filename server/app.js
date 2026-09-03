@@ -13,6 +13,8 @@ const path = require("path");
 const urlMod = require("url");
 const os = require("os");
 
+const appLog = require("./lib/app-log");
+appLog.install();
 const cfg = require("./config");
 const auth = require("./auth");
 const gbApi = require("./lib/gb-api");
@@ -160,6 +162,7 @@ const server = http.createServer(async (req, res) => {
   const method = req.method;
 
   try {
+    if (appLog.shouldLogApi(method, pathname)) appLog.apiLine(method, pathname);
     // ---- 公开路由 ----
     if (method === "POST" && pathname === "/api/login") {
       const body = await readBody(req);

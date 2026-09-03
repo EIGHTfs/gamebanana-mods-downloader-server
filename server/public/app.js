@@ -532,7 +532,6 @@ function bindProgress() {
     if (r && r.ok) refreshTask();
   });
   $("#stopBtn").addEventListener("click", async () => {
-    if (!confirm("确定终止下载吗？已下载的文件会保留。")) return;
     const r = await api("/api/task/stop", "POST", {});
     if (r && r.ok) {
       refreshTask(); // 立即刷新（task=null → 列表清空显示"暂无任务"）
@@ -689,12 +688,29 @@ function fmtSpeed(s) {
   return s >= 1048576 ? (s / 1048576).toFixed(2) + " MB/s" : Math.round(s / 1024) + " KB/s";
 }
 
+function updateSpeedHud(task) {
+  const el = $("#speedHud");
+  if (!el) return;
+  const sp = task && task.totalSpeed ? task.totalSpeed : 0;
+  if (sp > 0) {
+    el.hidden = false;
+    el.textContent = "⬇ " + fmtSpeed(sp);
+  } else {
+    el.hidden = true;
+  }
+}
+
+function diffArrow(from, to) {
+  return '<span class="diff-from">' + esc(from) + '</span> → <span class="diff-to">' + esc(to) + '</span>';
+}
+
 // 2026-08-26 优化（用户反馈：网页刷新下载进度每次重新加载半天）：
 //   renderTask 每次 2 秒轮询都全量遍历 items 分组 + 重渲染 DOM（任务几百上千项时卡顿）。
 //   加分组指纹缓存：items/resultsMap 未变化时直接复用上次的 taskList HTML。
 let __renderTaskCache = { fingerprint: "", html: "" };
 
 function renderTask(task) {
+  updateSpeedHud(task);
   const stateText = { running: "下载中", preparing: "准备中", done: "已完成", paused: "已暂停", stopped: "已终止", error: "出错" };
   $("#taskState").textContent = task ? (stateText[task.status] || task.status) : "无任务";
   // 2026-08-27：找回模式开关——有任务时禁用
@@ -1485,12 +1501,11 @@ async function mergeRolesPreview() {
   st.textContent = `发现 ${d.groups} 组可合并角色目录（${mergePlan.length} 个将归一到标准「英文 – 中文」，变体目录并入标准目录）`;
   st.className = "status ok";
   el.innerHTML = mergePlan.length
-    ? mergePlan.map((m) => `<div class="mm-mis">🔀 ${esc(m.from.split("/Mods/")[1] || m.from)} → <b>${esc(m.to.split("/Mods/")[1] || m.to)}</b></div>`).join("")
+    ? mergePlan.map((m) => `<div class="mm-mis">${diffArrow(m.from.split("/Mods/")[1] || m.from, m.to.split("/Mods/")[1] || m.to)}</div>`).join("")
     : '<div class="hint">无需要合并的角色目录</div>';
 }
 async function mergeRolesRun() {
   if (!mergePlan.length) { showFeedback("请先「预览合并计划」", "err"); return; }
-  if (!confirm(`执行合并：${mergePlan.length} 个目录归一为「英文 – 中文」（变体目录并入标准目录；同角色已有规范目录则并入，空目录进 .trash）？`)) return;
   const game = $("#mmGameSelect").value;
   const st = $("#mmMergeStatus");
   st.textContent = "合并中…";
@@ -1514,16 +1529,19 @@ async function emptyDirsPreview() {
   const d = await api("/api/cleanup-empty-dirs", "POST", { dryRun: true, game });
   const el = $("#mmEmptyPlan");
   if (!d || !d.ok) { setStatus(st, "失败: " + ((d && d.error) || "未知"), "err"); return; }
-  emptyPlan = (d.cleared || []).map((m) => m.dir);
+  emptyPlan = d.cleared || [];
   st.textContent = `发现 ${emptyPlan.length} 个空文件夹（空壳/仅含HTML，预览见下）`;
   st.className = "status ok";
   el.innerHTML = emptyPlan.length
-    ? emptyPlan.map((dir) => `<div class="mm-mis">🗑 ${esc((dir || "").split("/Mods/")[1] || dir)}</div>`).join("")
+    ? emptyPlan.map((m) => {
+        const from = (m.dir || "").split("/Mods/")[1] || m.dir || "";
+        const to = (m.trash || "").split("/Mods/")[1] || m.trash || ".trash";
+        return `<div class="mm-mis">${diffArrow(from, to)}</div>`;
+      }).join("")
     : '<div class="hint">没有空文件夹</div>';
 }
 async function emptyDirsRun() {
   if (!emptyPlan.length) { showFeedback("请先「预览待清空」", "err"); return; }
-  if (!confirm(`确认清空 ${emptyPlan.length} 个空文件夹（空壳/仅含HTML，进游戏根 .trash 可恢复）？`)) return;
   const game = $("#mmEmptyGame").value;
   const st = $("#mmEmptyStatus");
   st.textContent = "清空中…";

@@ -203,22 +203,36 @@ function loadGameSelects() {
 }
 
 function bindSearch() {
-  const now = new Date();
-  const d30 = new Date(now.getTime() - 30 * 86400000);
-  // 2026-08-31 修复：toISOString() 是 UTC（东八区会显示成前一天），改用本地日期拼 YYYY-MM-DD
   const localDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  $("#searchEnd").value = localDate(now);
-  $("#searchStart").value = localDate(d30);
+  // 开始和结束都默认今天（bindInputs 内部也会兜底，这里提前填好防闪烁）
+  const today = (window.SearchDateRange && SearchDateRange.todayYmd()) || localDate(new Date());
+  if (!$("#searchStart").value) $("#searchStart").value = today;
+  if (!$("#searchEnd").value) $("#searchEnd").value = today;
+  if (window.SearchDateRange && $("#searchStart") && $("#searchEnd")) {
+    SearchDateRange.bindInputs($("#searchStart"), $("#searchEnd"), function () {
+      $("#searchStatus").textContent = "已自动修正日期范围";
+    });
+  }
 
   $("#earliestBtn").addEventListener("click", () => {
-    $("#searchStart").value = "2000-01-01";
+    $("#searchStart").value = (window.SearchDateRange && SearchDateRange.EARLIEST) || "2000-01-01";
+    if (window.SearchDateRange && $("#searchEnd")) {
+      const r = SearchDateRange.enforceDateRules($("#searchStart").value, $("#searchEnd").value);
+      $("#searchStart").value = r.startDate;
+      $("#searchEnd").value = r.endDate;
+    }
     $("#searchStatus").textContent = "开始日期已设为最早（2000-01-01）";
   });
 
   $("#searchBtn").addEventListener("click", async () => {
-    const startDate = $("#searchStart").value;
-    const endDate = $("#searchEnd").value;
-    if (!startDate || !endDate) { $("#searchStatus").textContent = "请选择日期范围"; return; }
+    const range = window.SearchDateRange
+      ? SearchDateRange.enforceDateRules($("#searchStart").value, $("#searchEnd").value)
+      : { startDate: $("#searchStart").value || "2000-01-01", endDate: $("#searchEnd").value };
+    $("#searchStart").value = range.startDate;
+    $("#searchEnd").value = range.endDate;
+    const startDate = range.startDate || "2000-01-01";
+    const endDate = range.endDate;
+    if (!endDate) { $("#searchStatus").textContent = "请选择结束日期"; return; }
     const game = $("#searchGameSelect").value;
     if (!game) { $("#searchStatus").textContent = "请选择要筛选的游戏"; return; }
     const contentFilter = [];

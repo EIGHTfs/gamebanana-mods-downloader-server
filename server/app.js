@@ -18,6 +18,7 @@ const auth = require("./auth");
 const gbApi = require("./lib/gb-api");
 const downloader = require("./lib/downloader");
 const search = require("./lib/search");
+const searchDateRange = require("./lib/search-date-range.cjs");
 const mergeDirs = require("./lib/merge-dirs");
 const dataBackup = require("./lib/data-backup");
 const hashIndex = require("./lib/hash-index");
@@ -518,14 +519,13 @@ const server = http.createServer(async (req, res) => {
     // ---- 按时间搜索（保留）----
     if (method === "POST" && pathname === "/api/search") {
       const body = await readBody(req);
-      const startTs = Math.floor(new Date(body.startDate + "T00:00:00").getTime() / 1000);
-      const endTs = Math.floor(new Date(body.endDate + "T00:00:00").getTime() / 1000) + 86400;
-      if (isNaN(startTs) || isNaN(endTs)) return sendJson(res, 400, { ok: false, error: "日期格式无效" });
+      const range = searchDateRange.resolveRange(body.startDate, body.endDate);
+      if (!range.ok) return sendJson(res, 400, { ok: false, error: range.error });
       const contentFilter = Array.isArray(body.contentFilter) && body.contentFilter.length ? body.contentFilter : ["normal", "nsfw"];
       let games = (body.games || []).filter((g) => g && String(g).trim());
       if (!games.length) return sendJson(res, 400, { ok: false, error: "未指定要搜索的游戏" });
       try {
-        const t = await search.startSearchTask({ games, startDate: body.startDate, endDate: body.endDate, contentFilter, startTs, endTs });
+        const t = await search.startSearchTask({ games, startDate: range.startDate, endDate: range.endDate, contentFilter, startTs: range.startTs, endTs: range.endTs });
         return sendJson(res, 200, { ok: true, started: true, task: t });
       } catch (e) {
         return sendJson(res, 400, { ok: false, error: e.message || String(e) });

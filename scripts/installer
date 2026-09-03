@@ -1,0 +1,73 @@
+#!/bin/bash
+# ============================================================
+# gbmd 套件安装器（群晖 installer hook：preinst/postinst/
+# preuninst/preupgrade/postupgrade）
+# 群晖调用方式：scripts/installer <hook> <pkgname> ...
+# 数据目录：/var/packages/gbmd/var（config.json/日志/pid，升级不丢）
+# ============================================================
+SYNOPKG_PKGNAME="${2:-gbmd}"
+SYNOPKG_PKGDEST="/var/packages/${SYNOPKG_PKGNAME}/target"
+SYNOPKG_PKGVAR="/var/packages/${SYNOPKG_PKGNAME}/var"
+SYNOPKG_PKGTMP="/var/packages/${SYNOPKG_PKGNAME}/tmp"
+SCRIPTS_DIR="/var/packages/${SYNOPKG_PKGNAME}/scripts"
+
+mkdir_pkg_dirs() {
+  mkdir -p "${SYNOPKG_PKGVAR}"
+  mkdir -p "${SYNOPKG_PKGTMP}"
+}
+
+stop_service() {
+  [ -x "${SCRIPTS_DIR}/start-stop-status" ] && "${SCRIPTS_DIR}/start-stop-status" stop >/dev/null 2>&1
+  return 0
+}
+
+preinst() {
+  # 安装前检查：可选
+  exit 0
+}
+
+fix_ownership() {
+  # 2026-08-31：run-as package（群晖不允许 root 运行套件）
+  # 把 target/var 属主改为套件用户 gamebanana-mods-downloader，否则 package 用户无写权限（运行会失败）
+  # 注意：target/var 是符号链接（→ /volume1/@appstore / @appdata），chown -R 需先解析真实路径
+  local PKGDEST_REAL PKGVAR_REAL
+  PKGDEST_REAL="$(readlink -f "${SYNOPKG_PKGDEST}" 2>/dev/null || echo "${SYNOPKG_PKGDEST}")"
+  PKGVAR_REAL="$(readlink -f "${SYNOPKG_PKGVAR}" 2>/dev/null || echo "${SYNOPKG_PKGVAR}")"
+  chown -R gamebanana-mods-downloader:system "${PKGDEST_REAL}" 2>/dev/null || true
+  chown -R gamebanana-mods-downloader:system "${PKGVAR_REAL}" 2>/dev/null || true
+}
+
+postinst() {
+  mkdir_pkg_dirs
+  fix_ownership
+  exit 0
+}
+
+preuninst() {
+  stop_service
+  exit 0
+}
+
+preupgrade() {
+  stop_service
+  exit 0
+}
+
+postupgrade() {
+  mkdir_pkg_dirs
+  # 2026-08-31 修复：升级安装走的是 postupgrade（不是 postinst）！
+  #   之前旧版套件用户名是 gbmd，升级后 var 里旧文件（gbmd.log 等）属主仍是 gbmd:gbmd，
+  #   新用户 gamebanana-mods-downloader 无写权限 → 启动 Permission denied → synopkg 272。
+  #   升级路径同样要 fix_ownership，否则老用户换名后套件起不来。
+  fix_ownership
+  exit 0
+}
+
+case "$1" in
+  preinst) preinst ;;
+  postinst) postinst ;;
+  preuninst) preuninst ;;
+  preupgrade) preupgrade ;;
+  postupgrade) postupgrade ;;
+  *) exit 0 ;;
+esac

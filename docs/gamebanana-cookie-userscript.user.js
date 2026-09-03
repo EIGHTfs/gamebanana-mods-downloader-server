@@ -3,7 +3,7 @@
 // @namespace    gbmd-cred
 // @version      4.3.0
 // @description  右下角 🍌 面板：显示 GameBanana 登录态/用户名/剩余天数、复制完整 Cookie（含 HttpOnly，sess+rmc）；「📤 发送到服务器」把当前 mod 页链接一键推给 GameBanana Mod Downloader 下载（设了密码会自动用保存的密码登录）；「🔄 注入登录态到浏览器」把服务器保存的 Cookie 写回当前浏览器（GM_cookie 双域写入）
-// @author       fnOS
+// @author       EIGHTfs
 // @match        https://gamebanana.com/*
 // @match        https://www.gamebanana.com/*
 // @grant        GM_setClipboard

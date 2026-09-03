@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GameBanana 下载助手（Cookie + 一键发送到服务器）
 // @namespace    gbmd-cred
-// @version      4.3.0
+// @version      4.4.0
 // @description  右下角 🍌 面板：显示 GameBanana 登录态/用户名/剩余天数、复制完整 Cookie（含 HttpOnly，sess+rmc）；「📤 发送到服务器」把当前 mod 页链接一键推给 GameBanana Mod Downloader 下载（设了密码会自动用保存的密码登录）；「🔄 注入登录态到浏览器」把服务器保存的 Cookie 写回当前浏览器（GM_cookie 双域写入）
 // @author       fnOS
 // @match        https://gamebanana.com/*
@@ -41,9 +41,12 @@
 (function () {
     "use strict";
 
-    const VER = "4.3.0";
-    const SRV_KEY = "gbcred_server";      // gbmd 服务器地址
-    const SRV_PWD_KEY = "gbcred_server_pwd"; // 服务器访问密码
+    const VER = "4.4.0";
+    const GB_ICON = "data:image/png;base64,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";
+    const SRV_KEY = "gbcred_server";      // 当前选中的服务器地址
+    const SRV_PWD_KEY = "gbcred_server_pwd"; // 当前选中的访问密码
+    // 用户原话「填写和读取分离…添加后的服务端用下拉列表展示选择，不能被修改只能删除」
+    const SRV_LIST_KEY = "gbcred_server_list";
     function log(...a) { try { console.log("[gb-cred " + VER + "]", ...a); } catch (_) {} }
 
     /* ---------- 工具 ---------- */
@@ -71,6 +74,101 @@
             if (s) localStorage.setItem("gbcred:" + key, s);
             else localStorage.removeItem("gbcred:" + key);
         } catch (_) {}
+    }
+
+    /** 规范化服务器地址：没写协议补 http://；去末尾 / */
+    function normalizeServerBase(url) {
+        let s = String(url || "").trim();
+        if (!s) return "";
+        s = s.replace(/\/+$/, "");
+        if (!/^https?:\/\//i.test(s)) s = "http://" + s;
+        return s;
+    }
+
+    function loadServerList() {
+        let raw = storeGet(SRV_LIST_KEY);
+        let list = [];
+        try { list = raw ? JSON.parse(raw) : []; } catch (_) { list = []; }
+        if (!Array.isArray(list)) list = [];
+        list = list.map((it) => ({
+            url: normalizeServerBase(it && it.url),
+            password: String((it && it.password) || "")
+        })).filter((it) => it.url);
+        const seen = new Set();
+        const uniq = [];
+        for (const it of list) {
+            if (seen.has(it.url)) continue;
+            seen.add(it.url);
+            uniq.push(it);
+        }
+        // 【原代码】只记一条 SRV_KEY。【改为】用户原话「下拉列表」【思路】旧地址迁进清单
+        const legacy = normalizeServerBase(storeGet(SRV_KEY));
+        if (legacy && !uniq.some((it) => it.url === legacy)) {
+            uniq.unshift({ url: legacy, password: storeGet(SRV_PWD_KEY) });
+            saveServerList(uniq);
+        }
+        return uniq;
+    }
+    function saveServerList(list) {
+        storeSet(SRV_LIST_KEY, JSON.stringify(list || []));
+    }
+    function currentServer() {
+        const list = loadServerList();
+        const sel = normalizeServerBase(storeGet(SRV_KEY));
+        return list.find((it) => it.url === sel) || list[0] || null;
+    }
+    function fillServerSelect() {
+        const sel = panelEl && panelEl.querySelector("#gbcred-server");
+        if (!sel) return;
+        const list = loadServerList();
+        const cur = currentServer();
+        sel.innerHTML = "";
+        if (!list.length) {
+            const o = document.createElement("option");
+            o.value = "";
+            o.textContent = "尚未添加服务端";
+            sel.appendChild(o);
+            return;
+        }
+        for (const it of list) {
+            const o = document.createElement("option");
+            o.value = it.url;
+            o.textContent = it.url;
+            sel.appendChild(o);
+        }
+        sel.value = cur ? cur.url : list[0].url;
+        if (cur) {
+            storeSet(SRV_KEY, cur.url);
+            storeSet(SRV_PWD_KEY, cur.password);
+        }
+    }
+    function addServerFromForm() {
+        const url = normalizeServerBase(panelEl.querySelector("#gbcred-url-new").value);
+        const password = panelEl.querySelector("#gbcred-pwd-new").value || "";
+        if (!url) { srvSetStatus("❌ 请填写服务器地址", "err"); return; }
+        const list = loadServerList();
+        if (list.some((it) => it.url === url)) { srvSetStatus("已存在该地址", "err"); return; }
+        list.push({ url, password });
+        saveServerList(list);
+        storeSet(SRV_KEY, url);
+        storeSet(SRV_PWD_KEY, password);
+        panelEl.querySelector("#gbcred-add-form").style.display = "none";
+        fillServerSelect();
+        srvSetStatus("已添加 " + url, "ok");
+        openPanel();
+    }
+    function deleteSelectedServer() {
+        const sel = panelEl.querySelector("#gbcred-server");
+        const url = sel && sel.value;
+        if (!url) { srvSetStatus("没有可删除的服务端", "err"); return; }
+        const list = loadServerList().filter((it) => it.url !== url);
+        saveServerList(list);
+        const next = list[0] || { url: "", password: "" };
+        storeSet(SRV_KEY, next.url);
+        storeSet(SRV_PWD_KEY, next.password);
+        fillServerSelect();
+        srvSetStatus("已删除 " + url, "ok");
+        openPanel();
     }
 
     /** 从 GM_cookie 读取完整 cookie（含 HttpOnly）。返回 { text, count, source, diag } */
@@ -141,15 +239,6 @@
         });
     }
 
-    /** 规范化服务器地址：没写协议补 http://；去末尾 / */
-    function normalizeServerBase(url) {
-        let s = String(url || "").trim();
-        if (!s) return "";
-        s = s.replace(/\/+$/, "");
-        if (!/^https?:\/\//i.test(s)) s = "http://" + s;
-        return s;
-    }
-
     /** 探测服务器在线 + 账号信息：GET /api/status（公开）→ 若需密码则 /api/login */
     async function probeServer(url) {
         const base = normalizeServerBase(url);
@@ -209,8 +298,9 @@
         style.id = "gbcred-style";
         style.textContent = `
 #gbcred-fab{position:fixed;right:14px;bottom:14px;z-index:2147483647;width:56px;height:56px;border-radius:50%;
-  padding:0;border:none;cursor:pointer;background:#2f6fed;color:#fff;font-size:26px;
+  padding:0;border:none;cursor:pointer;background:#1e2a33;overflow:hidden;
   box-shadow:0 4px 16px rgba(0,0,0,.35);-webkit-tap-highlight-color:transparent;pointer-events:auto}
+#gbcred-fab img{width:100%;height:100%;object-fit:contain;display:block}
 #gbcred-panel{position:fixed;left:0;right:0;bottom:0;z-index:2147483647;max-height:80vh;overflow:auto;
   background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -6px 30px rgba(0,0,0,.3);
   font:14px/1.6 system-ui,-apple-system,"Microsoft YaHei",sans-serif;color:#222;padding:0 0 16px}
@@ -239,12 +329,11 @@
 #gbcred-toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:2147483647;
   background:rgba(20,24,30,.92);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;
   max-width:86vw;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.3);display:none}
-#gbcred-server-row{display:flex;gap:6px;margin-top:4px}
+#gbcred-server-row{display:flex;gap:6px;margin-top:4px;align-items:center}
 #gbcred-server{flex:1;min-width:0;padding:8px;border:1px solid #c9cfd8;border-radius:8px;
   font:13px/1.4 ui-monospace,Consolas,monospace;color:#222;background:#fafbfc}
-#gbcred-pwd-row{display:flex;gap:6px;margin-top:4px}
-#gbcred-server-pwd{flex:1;min-width:0;padding:8px;border:1px solid #c9cfd8;border-radius:8px;
-  font:13px/1.4 ui-monospace,Consolas,monospace;color:#222;background:#fafbfc}
+#gbcred-add-form{display:none;margin-top:8px;padding:8px;background:#f7f9fc;border-radius:8px}
+#gbcred-add-form input{width:100%;box-sizing:border-box;margin:4px 0;padding:8px;border:1px solid #c9cfd8;border-radius:8px}
 #gbcred-send{background:#1a9d4b;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;
   font-weight:600;white-space:nowrap;font-size:13px}
 #gbcred-send:disabled{background:#9cc9ac;cursor:wait}
@@ -266,8 +355,11 @@
             if (!fabEl) {
                 fabEl = document.createElement("button");
                 fabEl.id = "gbcred-fab";
-                fabEl.textContent = "🍌";
                 fabEl.title = "GameBanana 下载助手";
+                const img = document.createElement("img");
+                img.src = GB_ICON;
+                img.alt = "GameBanana";
+                fabEl.appendChild(img);
                 fabEl.addEventListener("click", openPanel);
             }
             if (fabEl.parentNode !== document.documentElement) document.documentElement.appendChild(fabEl);
@@ -277,21 +369,26 @@
                 panelEl = document.createElement("div");
                 panelEl.id = "gbcred-panel";
                 panelEl.innerHTML = `
-<div id="gbcred-head"><b>🍌 GameBanana 下载助手</b><span id="gbcred-close">✕</span></div>
+<div id="gbcred-head"><b>GameBanana 下载助手</b><span id="gbcred-close">✕</span></div>
 <div id="gbcred-userbar">打开即可发送；没配置凭证时才采集本机 Cookie</div>
 <div id="gbcred-body">
   <label>📤 发送到服务器（当前 mod 页链接 → 服务器自行解析下载，不读 Cookie）</label>
   <div id="gbcred-server-row">
-    <input id="gbcred-server" placeholder="http://服务器IP:端口（如 http://192.168.1.10:8642）" spellcheck="false">
+    <select id="gbcred-server"></select>
     <button id="gbcred-send">📤 发送</button>
   </div>
-  <label style="margin-top:6px">服务器访问密码（可选；设了密码的服务器自动登录用，记在本地）</label>
-  <div id="gbcred-pwd-row">
-    <input id="gbcred-server-pwd" type="password" placeholder="服务器访问密码（留空则尝试免登录）" autocomplete="off">
-  </div>
   <div id="gbcred-srv-actions">
-    <button id="gbcred-save">💾 记住地址</button>
+    <button id="gbcred-add">➕ 添加</button>
+    <button id="gbcred-del">🗑 删除</button>
     <button id="gbcred-inject">🔄 注入登录态到浏览器</button>
+  </div>
+  <div id="gbcred-add-form">
+    <input id="gbcred-url-new" placeholder="http://IP:端口" spellcheck="false">
+    <input id="gbcred-pwd-new" type="password" placeholder="访问密码（可空）" autocomplete="off">
+    <div id="gbcred-srv-actions">
+      <button id="gbcred-add-ok">确认添加</button>
+      <button id="gbcred-add-cancel">取消</button>
+    </div>
   </div>
   <div id="gbcred-srv-status"></div>
   <div id="gbcred-local">
@@ -311,10 +408,23 @@
                     copyText(c.text, c.text ? "✅ 已复制完整 Cookie" : "❌ 未读到 Cookie（看诊断）");
                 });
                 panelEl.querySelector("#gbcred-send").addEventListener("click", doSend);
-                panelEl.querySelector("#gbcred-save").addEventListener("click", async () => {
-                    storeSet(SRV_KEY, panelEl.querySelector("#gbcred-server").value);
-                    storeSet(SRV_PWD_KEY, panelEl.querySelector("#gbcred-server-pwd").value);
-                    srvSetStatus("已记住服务器地址" + (panelEl.querySelector("#gbcred-server-pwd").value ? "（含密码）" : ""), "ok");
+                panelEl.querySelector("#gbcred-add").addEventListener("click", () => {
+                    panelEl.querySelector("#gbcred-add-form").style.display = "block";
+                    panelEl.querySelector("#gbcred-url-new").value = "";
+                    panelEl.querySelector("#gbcred-pwd-new").value = "";
+                });
+                panelEl.querySelector("#gbcred-add-cancel").addEventListener("click", () => {
+                    panelEl.querySelector("#gbcred-add-form").style.display = "none";
+                });
+                panelEl.querySelector("#gbcred-add-ok").addEventListener("click", addServerFromForm);
+                panelEl.querySelector("#gbcred-del").addEventListener("click", deleteSelectedServer);
+                panelEl.querySelector("#gbcred-server").addEventListener("change", () => {
+                    const url = panelEl.querySelector("#gbcred-server").value;
+                    const hit = loadServerList().find((it) => it.url === url);
+                    if (!hit) return;
+                    storeSet(SRV_KEY, hit.url);
+                    storeSet(SRV_PWD_KEY, hit.password);
+                    openPanel();
                 });
                 panelEl.querySelector("#gbcred-inject").addEventListener("click", srvInjectFlow);
             }
@@ -348,12 +458,10 @@
         ub.textContent = "正在检测服务器…";
         st.textContent = ""; st.className = ""; ta.value = ""; info.textContent = "";
 
-        // 恢复已保存的服务器地址/密码（GM + localStorage 双写）
-        let srv = "", pwd = "";
-        srv = storeGet(SRV_KEY);
-        pwd = storeGet(SRV_PWD_KEY);
-        if (srv) panelEl.querySelector("#gbcred-server").value = srv;
-        if (pwd) panelEl.querySelector("#gbcred-server-pwd").value = pwd;
+        fillServerSelect();
+        const cur = currentServer();
+        let srv = cur ? cur.url : "";
+        let pwd = cur ? cur.password : "";
 
         // 服务器地址为空 → 提示配置
         if (!normalizeServerBase(srv)) {
@@ -424,13 +532,13 @@
     /** 发送当前 mod 页链接到服务器 */
     async function doSend() {
         if (!ensureUi()) return;
-        const srvEl = panelEl.querySelector("#gbcred-server");
-        const pwdEl = panelEl.querySelector("#gbcred-server-pwd");
         const sendBtn = panelEl.querySelector("#gbcred-send");
         const u = currentModUrl();
         if (!u) { srvSetStatus("❌ 当前不是 mod 页（需 gamebanana.com/mods/数字）", "err"); return; }
-        const base = normalizeServerBase(srvEl.value);
-        if (!base) { srvSetStatus("❌ 请先填服务器地址", "err"); return; }
+        const cur = currentServer();
+        const base = cur ? cur.url : "";
+        const pwdEl = { value: cur ? cur.password : "" };
+        if (!base) { srvSetStatus("❌ 请先添加并选择服务器", "err"); return; }
         sendBtn.disabled = true;
         try {
             srvSetStatus(`服务器在线，正在发送 mod…（${u}）`, "info");
@@ -489,9 +597,9 @@
     /** 注入主流程：连接服务器 → GET /api/cred → 写 cookie，提示刷新。 */
     async function srvInjectFlow() {
         if (!ensureUi()) return;
-        const srvEl = panelEl.querySelector("#gbcred-server");
-        const base = normalizeServerBase((srvEl && srvEl.value.trim()) || "");
-        if (!base) { srvSetStatus("❌ 请先填服务器地址", "err"); return; }
+        const cur = currentServer();
+        const base = cur ? cur.url : "";
+        if (!base) { srvSetStatus("❌ 请先添加并选择服务器", "err"); return; }
         const btn = panelEl.querySelector("#gbcred-inject");
         if (btn) btn.disabled = true;
         try {
@@ -500,8 +608,7 @@
             if (!p.ok) { srvSetStatus("注入失败：无法连接服务器 " + p.error, "err"); return; }
             let session = "";
             if (p.status && p.status.needsAuth) {
-                const pwdEl = panelEl.querySelector("#gbcred-server-pwd");
-                const lg = await serverLogin(base, (pwdEl && pwdEl.value) || "");
+                const lg = await serverLogin(base, (cur && cur.password) || "");
                 if (!lg.ok) { srvSetStatus("注入失败：服务器设有密码 " + lg.error, "err"); return; }
                 session = lg.session;
             }

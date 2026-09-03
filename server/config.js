@@ -10,7 +10,19 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
+const jsonDir = require("./lib/json-dir");
+// config.json 例外：留在 server/。用户原话：「config.json是例外本来就应该在server文件夹」
 const CONFIG_PATH = path.join(__dirname, "config.json");
+(function restoreConfigFromJsonDir() {
+  const misplaced = jsonDir.jsonFile("config.json");
+  try {
+    if (!fs.existsSync(CONFIG_PATH) && fs.existsSync(misplaced)) {
+      fs.renameSync(misplaced, CONFIG_PATH);
+    } else if (fs.existsSync(CONFIG_PATH) && fs.existsSync(misplaced)) {
+      fs.unlinkSync(misplaced);
+    }
+  } catch (_) {}
+})();
 const SHARED_JSON_DIR = path.join(__dirname, "..", "json");
 const GAME_PATH = path.join(SHARED_JSON_DIR, "gamebanana.com.json");
 const MAPPING_DIR = path.join(__dirname, "..", "mapping");

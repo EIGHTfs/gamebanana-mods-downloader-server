@@ -9,7 +9,8 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
-const SESSION_FILE = path.join(__dirname, "sessions.json");
+const jsonDir = require("./lib/json-dir");
+const SESSION_FILE = jsonDir.migrateRuntimeJson("sessions.json");
 const sessions = new Map(); // token -> { expiresAt }
 
 function loadSessions() {
@@ -28,6 +29,7 @@ function saveSessions() {
   const data = {};
   for (const [token, s] of sessions) data[token] = { expiresAt: s.expiresAt };
   try {
+    jsonDir.ensureJsonDir();
     fs.writeFileSync(SESSION_FILE, JSON.stringify(data), "utf8");
   } catch (_) {}
 }

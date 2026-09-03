@@ -1,10 +1,15 @@
-# 敏感/运行态数据
+# 敏感/运行态数据 —— JSON 在仓库根 json/（清单 json/userdata-manifest.json 入库）
+json/sessions.json
+json/download_task.json
+json/search_cache.json
+json/search_task.json
 server/config.json
 server/*.log
 server/sessions.json
 server/download_task.json
 server/search_cache.json
 server/search_task.json
+/userdata-manifest.json
 # hash 反查：索引改为按游戏分文件存 json/index/（含本地路径、运行态数据，整体忽略不入库）
 #   旧全局 3 文件（gb/local/html-name）首次启动自动迁移拆分后删除，不再使用
 json/index/

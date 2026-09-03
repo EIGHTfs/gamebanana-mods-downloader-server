@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "app": "gamebanana-mods-downloader",
+  "note": "用户数据文件清单。备份/恢复按此收集与写回。运行态 JSON 在仓库根 json/；config.json 例外仍在 server/。本清单在 json/userdata-manifest.json。旧 zip 里 app=gbmd 仍可导入。",
+  "files": [
+    {
+      "rel": "server/config.json",
+      "desc": "服务配置（例外留在 server/）：访问密码哈希、gbCookie、sessionHours、端口等"
+    },
+    {
+      "rel": "json/sessions.json",
+      "desc": "登录会话（启动时加载一次，导入后需重启生效）"
+    },
+    {
+      "rel": "json/download_task.json",
+      "desc": "下载任务列表（含进度/状态，启动时恢复）"
+    },
+    {
+      "rel": "json/search_task.json",
+      "desc": "搜索任务（关键词搜索的进行中任务）"
+    },
+    {
+      "rel": "json/search_cache.json",
+      "desc": "搜索记录缓存（关键词/按时间搜索的已存结果）"
+    },
+    {
+      "rel": "json/gamebanana.com.json",
+      "desc": "游戏配置：每个游戏的中文名/香蕉网 id/本地下载根路径"
+    },
+    {
+      "rel": "json/gb-hash-index.json",
+      "desc": "GB 信息表索引（hash → 线上 mod 信息，重建可生成）"
+    },
+    {
+      "rel": "json/local-hash-index.json",
+      "desc": "本地哈希索引（hash → 实际下载位置，本机特有）"
+    },
+    {
+      "rel": "json/html-name-index.json",
+      "desc": "HTML 原名索引（GB 原名短名 → mod，扫描 description.html 生成）"
+    }
+  ],
+  "dirs": [
+    {
+      "rel": "mapping",
+      "suffix": ".json",
+      "desc": "角色映射（手动添加/变体：角色英文名 → 中文名，每游戏一个文件）"
+    },
+    {
+      "rel": "json/role",
+      "suffix": ".json",
+      "desc": "角色缓存（香蕉网角色信息，运行中生成）"
+    },
+    {
+      "rel": "json/index",
+      "suffix": ".json",
+      "desc": "按游戏拆分的哈希/原名索引"
+    }
+  ]
+}

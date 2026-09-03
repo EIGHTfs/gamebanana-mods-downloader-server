@@ -12,7 +12,8 @@ const os = require("os");
 const { execFile } = require("child_process");
 
 const APP_ROOT = path.join(__dirname, "..", ".."); // 项目根（server/lib → 项目根）
-const MANIFEST_FILE = path.join(APP_ROOT, "userdata-manifest.json");
+const jsonDir = require("./json-dir");
+const MANIFEST_FILE = jsonDir.migrateRuntimeJson("userdata-manifest.json");
 
 // 压缩工具：优先用项目自带 tool/bin/ 下的二进制（随项目/套件分发，不依赖系统装了 zip 没有）；
 //   找不到再回退系统 PATH。2026-08-31 用户要求：tool 文件夹放可用的压缩工具（zip/tar）。

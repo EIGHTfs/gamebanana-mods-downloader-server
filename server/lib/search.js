@@ -11,8 +11,9 @@ const path = require("path");
 const { fetchOnePage, processPageRecords } = require("./gb-api");
 const cfg = require("../config");
 
-const QUERY_FILE = path.join(__dirname, "..", "search_task.json");
-const CACHE_FILE = path.join(__dirname, "..", "search_cache.json");
+const jsonDir = require("./json-dir");
+const QUERY_FILE = jsonDir.migrateRuntimeJson("search_task.json");
+const CACHE_FILE = jsonDir.migrateRuntimeJson("search_cache.json");
 
 const MAX_PAGES_PER_GAME = 600;
 const MAX_RESULTS = 5000;
@@ -22,7 +23,7 @@ let queryTask = null;
 let queryRunning = false;
 
 function saveQueryTask() {
-  try { fs.writeFileSync(QUERY_FILE, JSON.stringify(queryTask, null, 2), "utf8"); } catch (_) {}
+  try { jsonDir.ensureJsonDir(); fs.writeFileSync(QUERY_FILE, JSON.stringify(queryTask, null, 2), "utf8"); } catch (_) {}
 }
 
 function saveCache(explicit) {
@@ -35,6 +36,7 @@ function saveCache(explicit) {
       contentFilter: (queryTask && queryTask.contentFilter) || ["normal", "nsfw"],
       queryTime: Date.now()
     };
+    jsonDir.ensureJsonDir();
     fs.writeFileSync(CACHE_FILE, JSON.stringify(data), "utf8");
   } catch (_) {}
 }

@@ -44,7 +44,8 @@ const KEEP_ALIVE_MS = 60000;
 const HTTPS_AGENT = new https.Agent({ keepAlive: true, keepAliveMsecs: KEEP_ALIVE_MS, maxSockets: 64, maxFreeSockets: 32 });
 const HTTP_AGENT = new http.Agent({ keepAlive: true, keepAliveMsecs: KEEP_ALIVE_MS, maxSockets: 64, maxFreeSockets: 32 });
 
-const TASK_FILE = path.join(__dirname, "..", "download_task.json");
+const jsonDir = require("./json-dir");
+const TASK_FILE = jsonDir.migrateRuntimeJson("download_task.json");
 const MAX_RETRY = 3;
 const RETRY_DELAY_MS = 1500;
 
@@ -1082,6 +1083,7 @@ function saveTask() {
       activeItems: (task.activeItems || []).map((a) => ({ ...a, _spT: undefined, _spLast: undefined })),
       preparingItem: task.preparingItem ? { name: task.preparingItem.name, type: "preparing" } : null
     } : null;
+    jsonDir.ensureJsonDir();
     fs.writeFileSync(TASK_FILE, JSON.stringify(t, null, 2), "utf8");
   } catch (_) {}
 }

@@ -118,6 +118,7 @@ node server/boot.cjs
 | Honkai Star Rail | 18366 | 星穹铁道 |
 | Zenless Zone Zero | 19567 | 绝区零 |
 | Wuthering Waves | 20357 | 鸣潮 |
+| Arknights: Endfield | 21842 | 终末地 |
 
 ---
 
@@ -273,4 +274,5 @@ A: 已修复：恢复时目标目录不存在的项自动跳过（可能已被�
 
 | 版本 | 内容 |
 |---|---|
+| 4.4.2 | `gamebanana.com.json.example` 填 SA6400 六款游戏真实 `(gamebanana)` 路径（崩坏3/原神/星穹铁道/绝区零/鸣潮/终末地） |
 | 4.4.1 | 油猴作者 EIGHTfs；服务端地址添加后下拉选择、不能改只能删；下载可选压缩包/预览图；`boot.cjs` 零依赖启动；PID 放项目根全称 |

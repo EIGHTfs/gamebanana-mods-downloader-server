@@ -31,10 +31,8 @@ dist/
 dist/
 release/
 
-# 备份/日志残留
-server/*.bak-*
-server/*.log.bak-*
-*.bak
+# 备份/日志残留（2026-09-03：统配 *.bak*，任意层级 .bak 开头备份均忽略）
+*.bak*
 
 # 本地 GitHub 推送凭据（仅本机，绝不上库）——由 scripts/git-push.sh 读取
 .git-push-token

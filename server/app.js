@@ -86,6 +86,28 @@ function requireAuth(req) {
   return auth.isValidSession(auth.extractToken(req));
 }
 
+
+function injectAssetVersion(html, publicDir) {
+  // 用户原话：「固化skill 不要求用户强刷网页，而是升级页面版本」
+  return String(html).replace(
+    /(<(?:link|script)\b[^>]*(?:href|src)=["'])([^"']+\.(?:css|js))(\?[^"']*)?(["'][^>]*>)/gi,
+    function (_, pre, url, query, post) {
+      if (/^(https?:)?\/\//i.test(url) || url.indexOf("/vendor/") >= 0) return pre + url + (query || "") + post;
+      var rel = url.replace(/^\//, "");
+      var file = path.join(publicDir, rel);
+      var v = "";
+      try {
+        if (fs.existsSync(file)) v = String(fs.statSync(file).mtimeMs | 0);
+      } catch (_) {}
+      if (!v) return pre + url + (query || "") + post;
+      var q = String(query || "");
+      if (/[?&]v=/.test(q)) q = q.replace(/([?&])v=[^&]*/, "$1v=" + v);
+      else q = (q ? q + "&" : "?") + "v=" + v;
+      return pre + url + q + post;
+    }
+  );
+}
+
 function serveStatic(req, res, pathname) {
   let filePath = path.join(PUBLIC_DIR, pathname === "/" ? "index.html" : pathname);
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); res.end("Forbidden"); return; }
@@ -95,6 +117,12 @@ function serveStatic(req, res, pathname) {
     const headers = { "Content-Type": MIME[ext] || "application/octet-stream" };
     if (ext === ".html" || ext === ".js" || ext === ".css") {
       headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+    }
+    if (ext === ".html") {
+      const html = injectAssetVersion(fs.readFileSync(filePath, "utf8"), PUBLIC_DIR);
+      headers["Content-Length"] = Buffer.byteLength(html);
+      res.writeHead(200, headers);
+      return res.end(html);
     }
     res.writeHead(200, headers);
     fs.createReadStream(filePath).pipe(res);

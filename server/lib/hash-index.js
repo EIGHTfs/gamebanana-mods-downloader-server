@@ -15,7 +15,7 @@ const fs = require("fs");
 const path = require("path");
 
 const JSON_DIR = process.env.GBMD_JSON_DIR ? path.resolve(process.env.GBMD_JSON_DIR) : path.join(__dirname, "..", "..", "json");
-const INDEX_DIR = path.join(JSON_DIR, "index"); // 每游戏一个索引文件
+const INDEX_DIR = path.join(JSON_DIR, "index"); //userdata-manifest.json dir json/index .json 按游戏拆分的哈希/原名索引
 const LEGACY_FILES = [
   path.join(JSON_DIR, "gb-hash-index.json"),
   path.join(JSON_DIR, "local-hash-index.json"),

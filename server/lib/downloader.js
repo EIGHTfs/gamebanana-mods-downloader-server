@@ -45,7 +45,7 @@ const HTTPS_AGENT = new https.Agent({ keepAlive: true, keepAliveMsecs: KEEP_ALIV
 const HTTP_AGENT = new http.Agent({ keepAlive: true, keepAliveMsecs: KEEP_ALIVE_MS, maxSockets: 64, maxFreeSockets: 32 });
 
 const jsonDir = require("./json-dir");
-const TASK_FILE = jsonDir.migrateRuntimeJson("download_task.json");
+const TASK_FILE = jsonDir.migrateRuntimeJson("download_task.json"); //userdata-manifest.json file json/download_task.json 下载任务列表
 const MAX_RETRY = 3;
 const RETRY_DELAY_MS = 1500;
 

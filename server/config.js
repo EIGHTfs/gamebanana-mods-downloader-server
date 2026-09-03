@@ -12,7 +12,7 @@ const crypto = require("crypto");
 
 const jsonDir = require("./lib/json-dir");
 // config.json 例外：留在 server/。用户原话：「config.json是例外本来就应该在server文件夹」
-const CONFIG_PATH = path.join(__dirname, "config.json");
+const CONFIG_PATH = path.join(__dirname, "config.json"); //userdata-manifest.json file server/config.json 服务配置（例外留在 server/）
 (function restoreConfigFromJsonDir() {
   const misplaced = jsonDir.jsonFile("config.json");
   try {
@@ -24,8 +24,8 @@ const CONFIG_PATH = path.join(__dirname, "config.json");
   } catch (_) {}
 })();
 const SHARED_JSON_DIR = path.join(__dirname, "..", "json");
-const GAME_PATH = path.join(SHARED_JSON_DIR, "gamebanana.com.json");
-const MAPPING_DIR = path.join(__dirname, "..", "mapping");
+const GAME_PATH = path.join(SHARED_JSON_DIR, "gamebanana.com.json"); //userdata-manifest.json file json/gamebanana.com.json 游戏名/香蕉网 id/下载根路径
+const MAPPING_DIR = path.join(__dirname, "..", "mapping"); //userdata-manifest.json dir mapping .json 角色映射
 
 const DEFAULT_CONFIG = {
   port: 8642,

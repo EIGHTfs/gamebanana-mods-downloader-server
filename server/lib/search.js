@@ -12,8 +12,8 @@ const { fetchOnePage, processPageRecords } = require("./gb-api");
 const cfg = require("../config");
 
 const jsonDir = require("./json-dir");
-const QUERY_FILE = jsonDir.migrateRuntimeJson("search_task.json");
-const CACHE_FILE = jsonDir.migrateRuntimeJson("search_cache.json");
+const QUERY_FILE = jsonDir.migrateRuntimeJson("search_task.json"); //userdata-manifest.json file json/search_task.json 搜索任务状态
+const CACHE_FILE = jsonDir.migrateRuntimeJson("search_cache.json"); //userdata-manifest.json file json/search_cache.json 搜索记录缓存
 
 const MAX_PAGES_PER_GAME = 600;
 const MAX_RESULTS = 5000;

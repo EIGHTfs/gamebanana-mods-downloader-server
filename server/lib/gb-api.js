@@ -380,7 +380,7 @@ const CHAR_CACHE_MS = 10 * 60 * 1000;
 // 2026-08-27 用户要求：角色列表持久化到 json/role/ 文件夹，每个游戏一个 JSON 文件
 //   （文件名 = 游戏名，如 json/role/Genshin Impact.json / json/role/Zenless Zone Zero.json）。
 //   搜索页/设置页复用，默认读文件（不用每次翻 GB 页），设置页按钮手动刷新（forceRefresh）。
-const CHAR_CACHE_DIR = path.join(__dirname, "..", "..", "json", "role");
+const CHAR_CACHE_DIR = path.join(__dirname, "..", "..", "json", "role"); //userdata-manifest.json dir json/role .json 角色缓存
 const LEGACY_CACHE_FILE = path.join(__dirname, "..", "..", "json", "role-cache.json");
 
 function roleCachePath(gameName) {

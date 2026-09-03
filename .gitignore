@@ -40,6 +40,10 @@ server/*.log.bak-*
 .git-push-token
 .git-credentials-local
 
+# 运行态 PID（项目根/项目全称.pid，不入库）
+*.pid
+gamebanana-mods-downloader-server.pid
+
 # 零依赖项目，不需要 package.json（用户明确要求）
 package.json
 package-lock.json

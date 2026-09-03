@@ -50,6 +50,13 @@ try {
       <h2>下载 Mod</h2>
       <p class="hint">每行一个 Mod 链接或纯数字 id</p>
       <textarea id="batchInput" rows="8" placeholder="每行一个 Mod 链接或纯数字 id" style="width:100%"></textarea>
+      <!-- 2026-09-03 用户原话：「浏览器插件以前可以选择下载内容比如图片，压缩包，这两项我想给现在的server版本加回去」
+           AI 思路：下载页勾选、写入 config.json 全局记住；gif 跟图片；HTML 始终生成不设开关。默认两项都开。 -->
+      <div class="row mt">
+        <label><input type="checkbox" id="dlToggleFiles" checked> 压缩包（Mod 文件）</label>
+        <label><input type="checkbox" id="dlToggleImages" checked> 预览图（含 gif）</label>
+      </div>
+      <p class="hint">description.html 始终生成。关掉的一类本次不下；已有文件仍会查重归位。勾选会记住。</p>
       <div class="row mt">
         <button class="primary" id="batchBtn" type="button">开始下载</button>
         <button class="ghost" id="clearBtn" type="button">清空</button>
@@ -322,7 +329,7 @@ try {
 <button id="saveSettingsFab" type="button" title="保存设置">💾</button>
 
 <script src="path-picker.js?v=20260902"></script>
-<script src="app.js?v=20260902-picker"></script>
+<script src="app.js?v=20260903-toggles"></script>
 
 <!-- 目录选择弹窗（设置页「读取本地选择」下载路径） -->
 <div class="modal-mask" id="browseMask" style="display:none">

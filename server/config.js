@@ -36,17 +36,36 @@ const DEFAULT_CONFIG = {
   autoOrganize: false,
   // 2026-09-02 用户要求（#17）：默认下载位置——未在 gamebanana.com.json 配置 downloadPath
   //   的游戏，下载时自动落到「该根目录/<游戏名>」作为下载路径（gameRootOf fallback）。
-  defaultDownloadPath: ""
+  defaultDownloadPath: "",
+  // 2026-09-03 用户原话：「浏览器插件以前可以选择下载内容比如图片，压缩包，这两项我想给现在的server版本加回去」
+  // AI 思路：对齐旧扩展 toggles.files / toggles.images；gif 跟图片走；description.html 始终生成（索引/归位真相）。
+  // 缺字段视为 true，旧 config.json 行为不变（三项全下）。
+  downloadToggles: { files: true, images: true }
 };
+
+// 下载内容开关归一：只认 files / images 两个布尔；缺省或非 false = 开。
+// 用户原话：「压缩包 + 预览图 两个勾选；gif 跟图片；HTML 始终生成」
+function normalizeDownloadToggles(raw) {
+  const src = raw && typeof raw === "object" ? raw : {};
+  return {
+    files: src.files !== false,
+    images: src.images !== false
+  };
+}
 
 function readConfig() {
   try {
     if (fs.existsSync(CONFIG_PATH)) {
       const c = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
-      return Object.assign({}, DEFAULT_CONFIG, c);
+      const merged = Object.assign({}, DEFAULT_CONFIG, c);
+      // 嵌套对象不能靠顶层 Object.assign：旧文件缺 downloadToggles 或缺 files/images 时按默认全开
+      merged.downloadToggles = normalizeDownloadToggles(c.downloadToggles);
+      return merged;
     }
   } catch (_) {}
-  return Object.assign({}, DEFAULT_CONFIG);
+  const fallback = Object.assign({}, DEFAULT_CONFIG);
+  fallback.downloadToggles = normalizeDownloadToggles(DEFAULT_CONFIG.downloadToggles);
+  return fallback;
 }
 
 function writeConfig(obj) {
@@ -235,6 +254,7 @@ function addRoleMapping(game, en, zh) {
 module.exports = {
   readConfig,
   writeConfig,
+  normalizeDownloadToggles,
   hashPassword,
   verifyPassword,
   setPassword,

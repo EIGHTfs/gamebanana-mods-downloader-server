@@ -531,8 +531,14 @@ async function integrityCheck(finalDir, obj, root) {
 }
 
 // ---------- 第四步：构建下载项（正式下载由消费者执行）----------
+// 2026-09-03 用户原话：「浏览器插件以前可以选择下载内容比如图片，压缩包」
+// AI 思路：对齐旧扩展 buildModDownloadItems 的 if (settings.toggles.files/images)；
+//   HTML 第一步仍全量记录（查重/反查不丢），这里才按开关决定要不要入队下载。
+//   gif 跟图片走（用户确认）；关掉 images 时预览图和 gif 都不下。
 function buildDownloadItems(mod, finalDir, obj) {
   const items = [];
+  const toggles = cfg.normalizeDownloadToggles(cfg.readConfig().downloadToggles);
+  if (toggles.files) {
   for (const f of obj.files || []) {
     items.push({
       type: "file",
@@ -546,6 +552,8 @@ function buildDownloadItems(mod, finalDir, obj) {
       author: mod.author, game: mod.game
     });
   }
+  }
+  if (toggles.images) {
   for (const img of obj.images || []) {
     if (!img.url) continue;
     items.push({
@@ -575,6 +583,7 @@ function buildDownloadItems(mod, finalDir, obj) {
       modId: mod.modId, modName: mod.name, modUrl: mod.profileUrl,
       author: mod.author, game: mod.game
     });
+  }
   }
   return items;
 }

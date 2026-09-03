@@ -14,7 +14,9 @@ cd "$(dirname "$0")"
 
 # ---------- 路径定义 ----------
 LOG_FILE="server/server.log"
-PID_FILE="/tmp/gbmd.pid"
+# 【原代码】PID_FILE="/tmp/gbmd.pid"
+# 【改为】2026-09-03 用户原话：「PID_FILE="/项目根目录/项目全称.pid"」——不用 /tmp、不用简称
+PID_FILE="$(cd "$(dirname "$0")" && pwd)/gamebanana-mods-downloader-server.pid"
 NODE_BIN=""
 
 # ---------- 查找 node ----------
@@ -64,7 +66,9 @@ start_server() {
   fi
 
   # 准备启动命令
-  local cmd="\"$NODE_BIN\" server/app.js"
+  # 【原代码】local cmd="\"$NODE_BIN\" server/app.js"
+  # 【改为】零依赖、禁止 package.json；用 boot.cjs 强制本项目 .js 按 CommonJS 加载（父目录 type:module 时直接跑 app.js 会挂）
+  local cmd="\"$NODE_BIN\" server/boot.cjs"
   if [[ -n "$port_opt" ]]; then
     cmd="PORT=\"$port_opt\" $cmd"
   fi
@@ -145,7 +149,7 @@ if [[ "$1" == "--set-password" ]]; then
     echo "❌ 请提供新密码: --set-password \"新密码\""
     exit 1
   fi
-  "$NODE_BIN" server/app.js --set-password "$2"
+  "$NODE_BIN" server/boot.cjs --set-password "$2"
   echo "✓ 密码已设置"
   exit 0
 fi

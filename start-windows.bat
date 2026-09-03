@@ -7,7 +7,9 @@ rem   启动：        start-windows.bat start [--port 8642]
 rem   停止：        start-windows.bat stop
 rem   状态：        start-windows.bat status
 rem   设置密码：    start-windows.bat --set-password "新密码"
-rem 说明：后台运行，日志追加 server\server.log；PID 记录在 server\gbmd.pid
+rem 说明：后台运行，日志追加 server\server.log
+rem 【原代码】PID 记录在 server\gbmd.pid
+rem 【改为】项目根/项目全称.pid（不用 server\ 子目录、不用简称）
 rem ============================================================
 cd /d "%~dp0"
 setlocal
@@ -26,12 +28,14 @@ if "%NODE_BIN%"=="" (
 )
 echo [OK] Node.js: %NODE_BIN%
 
-set PID_FILE=server\gbmd.pid
+rem 【原代码】set PID_FILE=server\gbmd.pid
+set PID_FILE=gamebanana-mods-downloader-server.pid
 set PORT=8642
 
 rem ---------- 特殊：--set-password ----------
 if "%~1"=="--set-password" (
-  %NODE_BIN% server\app.js --set-password "%~2"
+  rem 【原代码】%NODE_BIN% server\app.js --set-password "%~2"
+  %NODE_BIN% server\boot.cjs --set-password "%~2"
   echo [OK] 密码已设置
   pause
   exit /b 0
@@ -102,7 +106,8 @@ rem ============================================================
   if not exist server mkdir server
   echo [START] 启动 gbmd-v3 ...（端口 %PORT%）
   rem 用 cmd 包装重定向追加日志；PowerShell 拿 cmd PID
-  for /f %%i in ('powershell -NoProfile -Command "$p=Start-Process -FilePath 'cmd.exe' -ArgumentList '/c','set PORT=%PORT% && node server\app.js >> server\server.log 2>&1' -WindowStyle Hidden -PassThru; $p.Id"') do set PID=%%i
+  rem 【原代码】node server\app.js；零依赖项目用 boot.cjs 强制本项目 .js 按 CommonJS 加载
+  for /f %%i in ('powershell -NoProfile -Command "$p=Start-Process -FilePath 'cmd.exe' -ArgumentList '/c','set PORT=%PORT% && node server\boot.cjs >> server\server.log 2>&1' -WindowStyle Hidden -PassThru; $p.Id"') do set PID=%%i
   echo %PID%> "%PID_FILE%"
   echo [OK] 服务已启动 PID=%PID%
   echo [OK] 访问 http://127.0.0.1:%PORT%

@@ -122,6 +122,34 @@ function switchTab(name) {
 }
 
 // ---------- 批量下载 ----------
+// 2026-09-03 用户原话：「浏览器插件以前可以选择下载内容比如图片，压缩包」
+// AI 思路：勾选即时写入 /api/settings 的 downloadToggles；搜索「下载勾选项」也走同一份 config，不必每次 POST 再带。
+function currentDownloadToggles() {
+  const filesEl = $("#dlToggleFiles");
+  const imagesEl = $("#dlToggleImages");
+  return {
+    files: filesEl ? filesEl.checked : true,
+    images: imagesEl ? imagesEl.checked : true
+  };
+}
+
+async function persistDownloadToggles() {
+  const downloadToggles = currentDownloadToggles();
+  try {
+    const r = await api("/api/settings", "POST", { downloadToggles });
+    if (r && r.ok && r.settings) settings = r.settings;
+  } catch (_) {}
+  return downloadToggles;
+}
+
+function bindDownloadToggles() {
+  ["dlToggleFiles", "dlToggleImages"].forEach((id) => {
+    const el = $("#" + id);
+    if (!el) return;
+    el.addEventListener("change", () => { persistDownloadToggles(); });
+  });
+}
+
 function bindBatch() {
   $("#batchBtn").addEventListener("click", async () => {
     const links = $("#batchInput").value.split("\n").map((s) => s.trim()).filter((s) => s);
@@ -129,6 +157,7 @@ function bindBatch() {
     $("#batchBtn").disabled = true;
     $("#batchStatus").textContent = "启动中…";
     try {
+      await persistDownloadToggles();
       const r = await api("/api/download", "POST", { links });
       if (!r.ok) throw new Error(r.error || "启动失败");
       $("#batchStatus").textContent = `已启动后台下载（${links.length} 个 mod），进度见「下载进度」标签`;
@@ -315,6 +344,7 @@ function bindSearch() {
     if (!selected.length) { $("#searchStatus").textContent = "请先勾选要下载的 mod"; return; }
     $("#searchStatus").textContent = `正在启动 ${selected.length} 个 mod 的下载…`;
     try {
+      await persistDownloadToggles();
       const r = await api("/api/download-selected", "POST", { items: selected });
       if (!r.ok) throw new Error(r.error || "启动失败");
       $("#searchStatus").textContent = `已启动后台下载（${selected.length} 个 mod），进度见「下载进度」标签`;
@@ -1410,6 +1440,12 @@ async function loadSettings() {
         ? "已保存 Cookie（再贴新凭证才会覆盖；留空不改）"
         : "粘贴 Cookie 后点保存（sess=xxx; rmc=xxx）";
     }
+    // 2026-09-03 回填下载内容勾选（downloadToggles，缺省全开）
+    const t = settings.downloadToggles || { files: true, images: true };
+    const filesEl = $("#dlToggleFiles");
+    const imagesEl = $("#dlToggleImages");
+    if (filesEl) filesEl.checked = t.files !== false;
+    if (imagesEl) imagesEl.checked = t.images !== false;
   } catch (_) {}
   try {
     const g = await api("/api/games");
@@ -1640,6 +1676,7 @@ async function init() {
     }
   } catch (_) {}
   bindTabs();
+  bindDownloadToggles();
   bindBatch();
   bindSearch();
   bindKeywordSearch();

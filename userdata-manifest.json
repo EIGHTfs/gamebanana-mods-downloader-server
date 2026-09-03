@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "app": "gbmd",
-  "note": "gbmd 用户数据文件清单。备份/恢复（设置页「数据备份/恢复」）按此收集与写回；files 为精确文件，dirs 为目录内按后缀收集。改动此清单前先确认路径归属。",
+  "app": "gamebanana-mods-downloader",
+  "note": "GameBanana Mods Downloader 用户数据文件清单。备份/恢复（设置页「数据备份/恢复」）按此收集与写回；files 为精确文件，dirs 为目录内按后缀收集。改动此清单前先确认路径归属。",
   "files": [
     { "rel": "server/config.json",       "desc": "服务配置：访问密码哈希、gbCookie、sessionHours、端口等（gitignore 排除，不入库）" },
     { "rel": "server/sessions.json",     "desc": "登录会话（启动时加载一次，导入后需重启生效）" },

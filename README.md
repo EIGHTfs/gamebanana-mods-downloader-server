@@ -30,22 +30,29 @@ git clone <仓库地址> && cd <项目目录>
 # 2. （可选）设置访问密码
 node server/boot.cjs --set-password "你的密码"
 
-# 3. 启动（必须走 boot.cjs：零依赖、禁止 package.json；父目录若为 ESM 时直接跑 app.js 会失败）
-node server/boot.cjs
+# 3. 启动（无参默认 restart；未运行会直接启动）
+./start.sh
 # 浏览器打开 http://127.0.0.1:8642
 ```
 
 > 未设置密码时**只警告、可直接使用**（局域网内任何人可访问，建议尽快设置）。
 > 首次启动自动生成 `server/config.json`（默认端口 8642）。
+> 必须走 `server/boot.cjs`（零依赖、禁止 package.json）；启停脚本已封装。
 
-**各平台一键启动脚本**（自动找 Node、支持 `--set-password` / `--port`）：
+**启停（POSIX 用 `start.sh`，Windows 用 `start-windows.bat`）**
 
-| 脚本 | 平台 |
+| 命令 | 作用 |
 |---|---|
-| `start-linux.sh` | Linux |
-| `start-macos.sh` | macOS |
-| `start-windows.bat` | Windows（前台） |
-| `start-windows-background.bat` | Windows（后台） |
+| `./start.sh` | 重启（默认；未运行则直接启动） |
+| `./start.sh start [--port 8642]` | 启动 |
+| `./start.sh restart [--port 8642]` | 重启 |
+| `./start.sh stop` | 停止（先 TERM 后 KILL，只杀 PID 文件里的进程） |
+| `./start.sh status` | 状态（进程 / HTTP 健康检查 / 日志） |
+| `./start.sh --set-password "新密码"` | 设置访问密码（不启动服务） |
+
+PID 文件：项目根 `gamebanana-mods-downloader-server.pid`（不入库）。
+
+`start-linux.sh` / `start-macos.sh` / `start-windows-background.bat` 是薄壳，转发到上面两个主入口。
 
 ---
 
@@ -286,9 +293,10 @@ A: 已修复：恢复时目标目录不存在的项自动跳过（可能已被�
 ## 版本
 
 | 版本 | 内容 |
+|---|---|
+| 4.6.0 | 启停脚本统一为 start.sh / start-windows.bat；PID 写在项目根 `gamebanana-mods-downloader-server.pid` |
 | 4.5.1 | 设置页改为整页长图 |
 | 4.5.0 | 网页界面截图：登录 / 下载 / 进度 / 搜索 / 设置 / 油猴 |
-|---|---|
 | 4.4.3 | 按时间搜索抽 `search-date-range.js`（与 Iwara 同一份）：结束含当天到次日 0 点；结束不能晚于今天；开始晚于结束则结束跟着开始 |
 | 4.4.2 | `gamebanana.com.json.example` 填 SA6400 六款游戏真实 `(gamebanana)` 路径（崩坏3/原神/星穹铁道/绝区零/鸣潮/终末地） |
 | 4.4.1 | 油猴作者 EIGHTfs；服务端地址添加后下拉选择、不能改只能删；下载可选压缩包/预览图；`boot.cjs` 零依赖启动；PID 放项目根全称 |

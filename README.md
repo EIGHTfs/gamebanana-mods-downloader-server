@@ -296,6 +296,7 @@ A: 已修复：恢复时目标目录不存在的项自动跳过（可能已被�
 
 | 版本 | 内容 |
 |---|---|
+| 4.7.1 | 公开库不再跟踪开发者文档 |
 | 4.7.0 | start.sh：彩色输出、日志 10MB 轮转压缩、启动前校验 config.json、status 更详细 |
 | 4.6.0 | 启停脚本统一为 start.sh / start-windows.bat；PID 写在项目根 `gamebanana-mods-downloader-server.pid` |
 | 4.5.1 | 设置页改为整页长图 |

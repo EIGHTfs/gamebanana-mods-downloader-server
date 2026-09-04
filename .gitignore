@@ -47,6 +47,12 @@ release/
 *.pid
 gamebanana-mods-downloader-server.pid
 
+# 开发者文档不入库（公开库）。本地可留在 docs/，权威副本在 ai-work-archive/开发者文档/
+docs/gbmd-开发者文档-*.md
+docs/gbmd-原始需求-*.md
+docs/gbmd-重构思路-*.md
+docs/gbmd-香蕉网角色名获取与映射文件规范-*.md
+
 # 零依赖项目，不需要 package.json（用户明确要求）
 package.json
 package-lock.json

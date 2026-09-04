@@ -60,8 +60,6 @@ node server/boot.cjs
 | 搜索 | 关键词搜索（中文归一）＋ 按时间搜索；结果勾选后一键下载 |
 | 设置 | 游戏下载路径（可读取本地目录）、GB Cookie 与登录检测、映射管理、文件夹合并、HTML 反查、修改密码 |
 
-> 📸 界面截图见文末「界面截图」章节（占位）。
-
 ---
 
 ## 目录结构
@@ -238,16 +236,31 @@ node server/boot.cjs
 
 ## 界面截图
 
-> 📸 待补充：下载页 / 下载进度 / 搜索页 / 设置页（白天 + 夜间模式）
->
-> 截图请放 `docs/screenshots/` 目录，并在下方替换：
+实际运行界面（Chromium 无头 CDP 截取）。Cookie 字段已打码。配套安装方式是油猴脚本。
 
-| 白天 | 夜间 |
+| 页面 | 说明 |
 |---|---|
-| `docs/screenshots/download-day.png` | `docs/screenshots/download-night.png` |
-| `docs/screenshots/progress-day.png` | `docs/screenshots/progress-night.png` |
-| `docs/screenshots/search-day.png` | `docs/screenshots/search-night.png` |
-| `docs/screenshots/settings-day.png` | `docs/screenshots/settings-night.png` |
+| [登录](docs/screenshots/01-login.jpg) | 访问密码登录 |
+| [下载](docs/screenshots/02-download.jpg) | 批量粘贴 mod 链接 / id，勾选压缩包与预览图 |
+| [下载进度](docs/screenshots/03-progress.jpg) | 任务状态、并发、导入导出 json |
+| [搜索](docs/screenshots/04-search.jpg) | 选游戏后关键词搜索，结果勾选下载 |
+| [设置](docs/screenshots/05-settings.jpg) | 游戏路径、Cookie、映射、文件夹合并 |
+| [油猴脚本](docs/screenshots/07-userscript.jpg) | 右下角面板：发送当前 mod 到服务器 |
+| [油猴 · GameBanana 站](docs/screenshots/08-userscript-gamebanana.jpg) | 在 gamebanana.com 打开的同一面板 |
+
+![登录](docs/screenshots/01-login.jpg)
+
+![下载](docs/screenshots/02-download.jpg)
+
+![下载进度](docs/screenshots/03-progress.jpg)
+
+![搜索](docs/screenshots/04-search.jpg)
+
+![设置](docs/screenshots/05-settings.jpg)
+
+![油猴脚本](docs/screenshots/07-userscript.jpg)
+
+![油猴 · GameBanana 站](docs/screenshots/08-userscript-gamebanana.jpg)
 
 ---
 
@@ -273,6 +286,7 @@ A: 已修复：恢复时目标目录不存在的项自动跳过（可能已被�
 ## 版本
 
 | 版本 | 内容 |
+| 4.5.0 | 网页界面截图：登录 / 下载 / 进度 / 搜索 / 设置 / 油猴 |
 |---|---|
 | 4.4.3 | 按时间搜索抽 `search-date-range.js`（与 Iwara 同一份）：结束含当天到次日 0 点；结束不能晚于今天；开始晚于结束则结束跟着开始 |
 | 4.4.2 | `gamebanana.com.json.example` 填 SA6400 六款游戏真实 `(gamebanana)` 路径（崩坏3/原神/星穹铁道/绝区零/鸣潮/终末地） |

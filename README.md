@@ -54,6 +54,8 @@ PID 文件：项目根 `gamebanana-mods-downloader-server.pid`（不入库）。
 
 `start-linux.sh` / `start-macos.sh` / `start-windows-background.bat` 是薄壳，转发到上面两个主入口。
 
+终端会自动用绿/黄/红提示（管道或 `NO_COLOR` 时关闭）。日志超过 10MB 在 start/restart 时轮转并 gzip。启动前校验 `server/config.json` 是否为合法 JSON、端口是否在 1–65535。
+
 ---
 
 ## 网页界面
@@ -294,6 +296,7 @@ A: 已修复：恢复时目标目录不存在的项自动跳过（可能已被�
 
 | 版本 | 内容 |
 |---|---|
+| 4.7.0 | start.sh：彩色输出、日志 10MB 轮转压缩、启动前校验 config.json、status 更详细 |
 | 4.6.0 | 启停脚本统一为 start.sh / start-windows.bat；PID 写在项目根 `gamebanana-mods-downloader-server.pid` |
 | 4.5.1 | 设置页改为整页长图 |
 | 4.5.0 | 网页界面截图：登录 / 下载 / 进度 / 搜索 / 设置 / 油猴 |

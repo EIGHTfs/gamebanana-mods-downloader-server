@@ -5,6 +5,7 @@ json/search_cache.json
 json/search_task.json
 server/config.json
 server/*.log
+test/logs/
 server/sessions.json
 server/download_task.json
 server/search_cache.json
@@ -47,11 +48,8 @@ release/
 *.pid
 gamebanana-mods-downloader-server.pid
 
-# 开发者文档不入库（公开库）。本地可留在 docs/，权威副本在 ai-work-archive/开发者文档/
-docs/gbmd-开发者文档-*.md
-docs/gbmd-原始需求-*.md
-docs/gbmd-重构思路-*.md
-docs/gbmd-香蕉网角色名获取与映射文件规范-*.md
+# 所有 gbmd-* 开发/需求/重构文档一律不入库（公开库），本地 docs/ 留底，权威副本在 ai-work-archive/开发者文档/
+docs/gbmd-*.md
 
 # 零依赖项目，不需要 package.json（用户明确要求）
 package.json

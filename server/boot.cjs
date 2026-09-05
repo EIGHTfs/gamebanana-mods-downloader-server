@@ -5,22 +5,5 @@
 //   只劫持本项目根内的 .js，项目外仍走 Node 原逻辑。
 "use strict";
 
-const fs = require("fs");
-const path = require("path");
-const Module = require("module");
-
-const PROJECT_ROOT = path.resolve(__dirname, "..");
-const origJs = Module._extensions[".js"];
-
-Module._extensions[".js"] = function loadProjectJsAsCjs(module, filename) {
-  const rel = path.relative(PROJECT_ROOT, filename);
-  const inside = rel && !rel.startsWith("..") && !path.isAbsolute(rel);
-  if (inside) {
-    const body = fs.readFileSync(filename, "utf8");
-    module._compile(body, filename);
-    return;
-  }
-  return origJs(module, filename);
-};
-
+require("./lib/cjs-bootstrap.cjs"); // CJS 强制（boot 与 test 共用），逻辑见 lib/cjs-bootstrap.cjs
 require("./app.js");

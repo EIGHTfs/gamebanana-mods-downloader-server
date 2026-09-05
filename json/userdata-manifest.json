@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "app": "gamebanana-mods-downloader",
+  "generatedAt": "2026-09-03T19:20:46.867Z",
+  "note": "导出时根据源码 //userdata-manifest.json 注释自动生成，不要手改。",
+  "files": [
+    {
+      "rel": "json/download_task.json",
+      "desc": "下载任务列表"
+    },
+    {
+      "rel": "json/gamebanana.com.json",
+      "desc": "游戏名/香蕉网 id/下载根路径"
+    },
+    {
+      "rel": "json/search_cache.json",
+      "desc": "搜索记录缓存"
+    },
+    {
+      "rel": "json/search_task.json",
+      "desc": "搜索任务状态"
+    },
+    {
+      "rel": "server/config.json",
+      "desc": "服务配置（例外留在 server/）"
+    }
+  ],
+  "dirs": [
+    {
+      "rel": "json/index",
+      "desc": "按游戏拆分的哈希/原名索引",
+      "suffix": ".json"
+    },
+    {
+      "rel": "json/role",
+      "desc": "角色缓存",
+      "suffix": ".json"
+    },
+    {
+      "rel": "mapping",
+      "desc": "角色映射",
+      "suffix": ".json"
+    }
+  ]
+}

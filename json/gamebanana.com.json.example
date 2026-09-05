@@ -1,0 +1,32 @@
+{
+  "Honkai Impact 3rd": {
+    "id": 10349,
+    "cn": "崩坏 3",
+    "downloadPath": "/volume6/Game.Patch N MOD/[miHoYo]/Honkai Impact 3 – 崩坏3/Mods/.Mods/(gamebanana)"
+  },
+  "Genshin Impact": {
+    "id": 8552,
+    "cn": "原神",
+    "downloadPath": "/volume6/Game.Patch N MOD/[miHoYo]/Genshin Impact – 原神/Mods/.Mods/(gamebanana)"
+  },
+  "Honkai Star Rail": {
+    "id": 18366,
+    "cn": "星穹铁道",
+    "downloadPath": "/volume6/Game.Patch N MOD/[miHoYo]/Star Rail – 星穹铁道/Mods/.Mods/(gamebanana)"
+  },
+  "Zenless Zone Zero": {
+    "id": 19567,
+    "cn": "绝区零",
+    "downloadPath": "/volume6/Game.Patch N MOD/[miHoYo]/Zenless Zone Zero – 绝零区/Mods/.Mods/(gamebanana)"
+  },
+  "Wuthering Waves": {
+    "id": 20357,
+    "cn": "鸣潮",
+    "downloadPath": "/volume6/Game.Patch N MOD/[库洛]/Wuthering Waves – 鸣潮/Mods/.Mods/(gamebanana)"
+  },
+  "Arknights: Endfield": {
+    "id": 21842,
+    "cn": "终末地",
+    "downloadPath": "/volume6/Game.Patch N MOD/[鹰角]/明日方舟：终末地/Mods/.Mods/(gamebanana)"
+  }
+}

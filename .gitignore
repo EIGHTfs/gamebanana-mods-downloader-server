@@ -1,0 +1,68 @@
+# 敏感/运行态数据 —— JSON 在仓库根 json/（清单 json/userdata-manifest.json 入库）
+json/sessions.json
+json/download_task.json
+json/search_cache.json
+json/search_task.json
+server/config.json
+server/*.log
+server/sessions.json
+server/download_task.json
+server/search_cache.json
+server/search_task.json
+/userdata-manifest.json
+# hash 反查：索引改为按游戏分文件存 json/index/（含本地路径、运行态数据，整体忽略不入库）
+#   旧全局 3 文件（gb/local/html-name）首次启动自动迁移拆分后删除，不再使用
+json/index/
+json/gb-hash-index.json
+json/local-hash-index.json
+json/html-name-index.json
+node_modules/
+.DS_Store
+
+# 真实游戏配置（含本地下载路径，敏感）——不上传；仓库只保留 gamebanana.com.json.example 示例
+json/gamebanana.com.json
+
+# 本机测试下载目录（不入库）
+_test-download/
+# 构建产物（release 由用户自行分发）
+dist/
+
+# 群晖 @eaDir 元数据
+@eaDir/
+**/@eaDir/
+*.@SynoEAStream
+
+# 构建产物（release 由用户自行分发）
+dist/
+release/
+
+# 备份/日志残留（2026-09-03：统配 *.bak*，任意层级 .bak 开头备份均忽略）
+*.bak*
+
+# 本地 GitHub 推送凭据（仅本机，绝不上库）——由 scripts/git-push.sh 读取
+.git-push-token
+.git-credentials-local
+
+# 运行态 PID（项目根/项目全称.pid，不入库）
+*.pid
+gamebanana-mods-downloader-server.pid
+
+# 开发者文档不入库（公开库）。本地可留在 docs/，权威副本在 ai-work-archive/开发者文档/
+docs/gbmd-开发者文档-*.md
+docs/gbmd-原始需求-*.md
+docs/gbmd-重构思路-*.md
+docs/gbmd-香蕉网角色名获取与映射文件规范-*.md
+
+# 零依赖项目，不需要 package.json（用户明确要求）
+package.json
+package-lock.json
+# npm 下载产物（dsh-git-push 自动追加，2026-08-20）
+yarn.lock
+pnpm-lock.yaml
+bun.lock
+npm-debug.log*
+.npm/
+.pnpm-store/
+# 注：2026-09-02 已移除 dsh-git-push 旧版误加的 14 条「敏感字段文件」忽略项——
+# 这些是项目源码/模板/油猴脚本（仅含字段名/API 参数/界面文案，无真实凭据值），
+# 已由 dsh-git-push v1.13+ 根因修复（只认字符串字面量）不再误报，恢复入库跟踪。
